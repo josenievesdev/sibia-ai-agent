@@ -74,6 +74,123 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+const FUZZY_SEARCH_FALLBACK_LIMIT = 500;
+const SEARCH_STOP_WORDS = new Set([
+  "el",
+  "la",
+  "los",
+  "las",
+  "un",
+  "una",
+  "unos",
+  "unas",
+  "producto",
+  "productos",
+  "de",
+  "del",
+]);
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("es")
+    .replace(/[^a-z0-9]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function searchTokens(value: string): string[] {
+  return normalizeSearchText(value)
+    .split(" ")
+    .filter((token) => token !== "" && !SEARCH_STOP_WORDS.has(token));
+}
+
+function levenshteinDistance(left: string, right: string): number {
+  if (left === right) {
+    return 0;
+  }
+  if (left === "") {
+    return right.length;
+  }
+  if (right === "") {
+    return left.length;
+  }
+
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= right.length; j += 1) {
+      const substitutionCost = left[i - 1] === right[j - 1] ? 0 : 1;
+      current[j] = Math.min(
+        (current[j - 1] ?? 0) + 1,
+        (previous[j] ?? 0) + 1,
+        (previous[j - 1] ?? 0) + substitutionCost,
+      );
+    }
+    previous = current;
+  }
+  return previous[right.length] ?? Math.max(left.length, right.length);
+}
+
+function fuzzyProductScore(
+  product: ProductListItem,
+  rawQuery: string,
+): number | null {
+  const queryTokens = searchTokens(rawQuery);
+  const nameTokens = searchTokens(product.nombre);
+  if (queryTokens.length === 0 || nameTokens.length === 0) {
+    return null;
+  }
+
+  let matched = 0;
+  let distanceTotal = 0;
+  const availableNameTokenIndexes = new Set(
+    nameTokens.map((_, index) => index),
+  );
+
+  for (const queryToken of queryTokens) {
+    let bestDistance = Number.POSITIVE_INFINITY;
+    let bestIndex: number | null = null;
+
+    for (const index of availableNameTokenIndexes) {
+      const nameToken = nameTokens[index];
+      if (nameToken === undefined) {
+        continue;
+      }
+
+      const directDistance = levenshteinDistance(queryToken, nameToken);
+      const prefixDistance =
+        nameToken.startsWith(queryToken) || queryToken.startsWith(nameToken)
+          ? 1
+          : directDistance;
+      const candidateDistance = Math.min(directDistance, prefixDistance);
+
+      if (candidateDistance < bestDistance) {
+        bestDistance = candidateDistance;
+        bestIndex = index;
+      }
+    }
+
+    const allowedDistance =
+      queryToken.length <= 4
+        ? 1
+        : Math.max(1, Math.floor(queryToken.length * 0.3));
+    if (bestIndex !== null && bestDistance <= allowedDistance) {
+      matched += 1;
+      distanceTotal += bestDistance;
+      availableNameTokenIndexes.delete(bestIndex);
+    }
+  }
+
+  const coverage = matched / queryTokens.length;
+  if (coverage < 0.6) {
+    return null;
+  }
+
+  return (queryTokens.length - matched) * 100 + distanceTotal * 10 + Math.abs(nameTokens.length - queryTokens.length);
+}
+
 function firstRelation<T>(value: T | T[] | null): T | null {
   if (Array.isArray(value)) {
     return value[0] ?? null;
@@ -204,7 +321,7 @@ export class SupabaseStoreGateway implements StoreGateway {
     }
 
     const normalizedQuery = query.toLocaleLowerCase("es");
-    return [...productsById.values()]
+    const exactMatches = [...productsById.values()]
       .sort((left, right) => {
         const rankDifference =
           productRank(left, normalizedQuery) -
@@ -221,6 +338,43 @@ export class SupabaseStoreGateway implements StoreGateway {
           : left.id.localeCompare(right.id);
       })
       .slice(0, limit);
+
+    if (exactMatches.length > 0) {
+      return exactMatches;
+    }
+
+    const fallbackResponse = await this.client
+      .from("productos")
+      .select(PRODUCT_COLUMNS)
+      .order("nombre_producto", { ascending: true })
+      .order("id_producto", { ascending: true })
+      .limit(FUZZY_SEARCH_FALLBACK_LIMIT);
+
+    if (fallbackResponse.error !== null) {
+      throw mapQueryError("public.productos", fallbackResponse.error);
+    }
+
+    return (fallbackResponse.data as unknown as DatabaseProduct[])
+      .map(mapProduct)
+      .map((product) => ({
+        product,
+        score: fuzzyProductScore(product, query),
+      }))
+      .filter(
+        (entry): entry is { product: ProductListItem; score: number } =>
+          entry.score !== null,
+      )
+      .sort((left, right) => {
+        const scoreDifference = left.score - right.score;
+        if (scoreDifference !== 0) {
+          return scoreDifference;
+        }
+        return left.product.nombre.localeCompare(right.product.nombre, "es", {
+          sensitivity: "base",
+        });
+      })
+      .slice(0, limit)
+      .map((entry) => entry.product);
   }
 
   async listProducts(query: ProductListQuery): Promise<ProductPage> {
@@ -241,6 +395,12 @@ export class SupabaseStoreGateway implements StoreGateway {
     }
 
     const firstRow = (query.pagina - 1) * query.tamanoPagina;
+    if (query.orden === "stock_asc") {
+      request = request.order("stock_actual", { ascending: true });
+    } else if (query.orden === "stock_desc") {
+      request = request.order("stock_actual", { ascending: false });
+    }
+
     const { data, error, count } = await request
       .order("nombre_producto", { ascending: true })
       .order("id_producto", { ascending: true })

@@ -7,9 +7,7 @@ export interface InteractiveChatAgent {
 export async function runInteractiveChat(
   agent: InteractiveChatAgent,
 ): Promise<void> {
-  console.log(
-    "SIBIA: Puedo consultar productos, stock registrado, proveedores y el resumen de inventario. Escribe /salir para terminar.",
-  );
+  console.log("SIBIA: Sesión iniciada. Escribe /salir para terminar.");
 
   while (true) {
     const message = await askText("Tú: ");

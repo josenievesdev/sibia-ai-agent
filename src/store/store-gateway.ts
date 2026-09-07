@@ -1,5 +1,6 @@
 export type ProductState = "activo" | "inactivo";
 export type StockFilter = "con_stock" | "sin_stock" | "todos";
+export type ProductSort = "nombre_asc" | "stock_asc" | "stock_desc";
 
 export interface ProductListItem {
   id: string;
@@ -20,6 +21,7 @@ export interface ProductListQuery {
   categoriaId?: string;
   estado?: ProductState;
   existencia: StockFilter;
+  orden: ProductSort;
   pagina: number;
   tamanoPagina: number;
 }

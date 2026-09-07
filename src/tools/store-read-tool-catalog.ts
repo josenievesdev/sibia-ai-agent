@@ -32,7 +32,7 @@ export const STORE_READ_TOOL_DEFINITIONS: readonly StoreReadToolDefinition[] = [
     function: {
       name: "buscar_productos",
       description:
-        "Busca productos por una parte de su nombre o por código de referencia. Úsala para identificar productos concretos, no para interpretar palabras de estado como activo o sin stock.",
+        "Busca productos concretos por nombre parcial o código. Tolera pequeñas variaciones tipográficas. Úsala cuando el usuario identifica, busca o menciona un producto por nombre. Si luego necesita stock o proveedores, usa el id devuelto para encadenar la tool específica; si hay varias coincidencias ambiguas, no elijas una al azar.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -60,7 +60,7 @@ export const STORE_READ_TOOL_DEFINITIONS: readonly StoreReadToolDefinition[] = [
     function: {
       name: "listar_productos",
       description:
-        "Lista y pagina el catálogo. Úsala para solicitudes como productos activos, inactivos, con stock o sin stock; activo es un filtro y no un nombre de producto.",
+        "Lista, filtra, pagina y ordena el catálogo. Úsala para consultas sobre conjuntos o comparaciones: catálogo, activos/inactivos, con/sin stock, mayor stock o menor stock. Para máximos usa orden=stock_desc; para mínimos usa orden=stock_asc. Para rankings usa un tamanoPagina pequeño; para revisar stock bajo consulta activos ordenados por stock_asc y compara stockRegistrado con stockMinimo en los resultados.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -97,6 +97,13 @@ export const STORE_READ_TOOL_DEFINITIONS: readonly StoreReadToolDefinition[] = [
             maximum: 50,
             default: 20,
             description: "Cantidad máxima de productos en la página.",
+          },
+          orden: {
+            type: "string",
+            enum: ["nombre_asc", "stock_asc", "stock_desc"],
+            default: "nombre_asc",
+            description:
+              "Orden del listado: alfabético, menor stock primero o mayor stock primero.",
           },
         },
       },
@@ -156,7 +163,7 @@ export const STORE_READ_TOOL_DEFINITIONS: readonly StoreReadToolDefinition[] = [
     function: {
       name: "resumen_inventario",
       description:
-        "Obtiene conteos globales autorizados de productos, productos activos, productos sin stock y productos activos con stock bajo.",
+        "Obtiene conteos globales autorizados del inventario: total de productos, activos, sin stock y con stock bajo. Úsala para preguntas globales de cantidad o resumen, aunque el usuario no use exactamente la palabra inventario.",
       parameters: {
         type: "object",
         additionalProperties: false,

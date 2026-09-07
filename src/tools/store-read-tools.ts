@@ -3,6 +3,7 @@ import {
   type InventorySummary,
   type ProductListItem,
   type ProductPage,
+  type ProductSort,
   type ProductState,
   type ProductStock,
   type ProductSuppliers,
@@ -233,6 +234,7 @@ export class StoreReadTools {
         "existencia",
         "pagina",
         "tamanoPagina",
+        "orden",
       ]);
 
       let categoryId: string | undefined;
@@ -255,6 +257,12 @@ export class StoreReadTools {
         ["todos", "con_stock", "sin_stock"] as const,
         "todos",
       );
+      const order = optionalEnum(
+        parsed,
+        "orden",
+        ["nombre_asc", "stock_asc", "stock_desc"] as const,
+        "nombre_asc",
+      );
       const page = optionalInteger(parsed, "pagina", 1, 1, 10_000);
       const pageSize = optionalInteger(
         parsed,
@@ -268,10 +276,12 @@ export class StoreReadTools {
         categoriaId?: string;
         estado?: ProductState;
         existencia: StockFilter;
+        orden: ProductSort;
         pagina: number;
         tamanoPagina: number;
       } = {
         existencia: stock,
+        orden: order,
         pagina: page,
         tamanoPagina: pageSize,
       };
@@ -288,7 +298,7 @@ export class StoreReadTools {
         tamanoPagina: result.tamanoPagina,
         total: result.total,
         totalPaginas: result.totalPaginas,
-        orden: ["nombre_producto:asc", "id_producto:asc"],
+        orden: order,
       };
 
       return result.items.length === 0
