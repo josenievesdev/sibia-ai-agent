@@ -25,7 +25,9 @@ export interface AppConfig {
   ollama: {
     baseUrl: string;
     chatTimeoutMs: number;
+    debug: boolean;
     model: typeof SIBIA_OLLAMA_MODEL;
+    numCtx: number;
   };
   supabase: SupabaseConfig | null;
 }
@@ -73,6 +75,11 @@ function parseInteger(
   }
 
   return value;
+}
+
+function parseBoolean(environment: NodeJS.ProcessEnv, name: string): boolean {
+  const rawValue = optionalValue(environment, name)?.toLowerCase();
+  return rawValue === "1" || rawValue === "true";
 }
 
 function parseHttpUrl(name: string, value: string): string {
@@ -220,7 +227,20 @@ export function loadConfig(
         1_000,
         600_000,
       ),
+      debug: parseBoolean(environment, "SIBIA_DEBUG"),
       model,
+      /*
+       * El valor por defecto de Ollama (4096) no alcanza para el prompt
+       * de SIBIA más las definiciones de tools y un resultado de tool:
+       * Ollama recorta el prompt en silencio y corta las llamadas a
+       * tool a medio escribir.
+       *
+       * 6144 es el mayor valor medido que mantiene ministral-3:8b al
+       * 100 % en GPU en esta máquina; con 8192 se reparte entre CPU y
+       * GPU, va mucho más lento y las recargas del runner devuelven
+       * turnos incompletos. Ajustable con OLLAMA_NUM_CTX según la VRAM.
+       */
+      numCtx: parseInteger(environment, "OLLAMA_NUM_CTX", 6_144, 2_048, 131_072),
     },
     supabase: parseSupabaseConfig(environment),
   };

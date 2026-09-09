@@ -28,7 +28,8 @@ async function startChat(
     return;
   }
 
-  const ollama = new OllamaChatClient(config.ollama);
+  const debug = config.ollama.debug || process.argv.includes("--debug");
+  const ollama = new OllamaChatClient({ ...config.ollama, debug });
   const tools = new StoreReadTools(new SupabaseStoreGateway(client));
   const catalog = new StoreReadToolCatalog(tools);
   const agent = new StoreChatAgent(ollama, catalog);
