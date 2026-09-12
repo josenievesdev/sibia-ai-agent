@@ -32,7 +32,7 @@ export const STORE_READ_TOOL_DEFINITIONS: readonly StoreReadToolDefinition[] = [
     function: {
       name: "buscar_productos",
       description:
-        "Busca productos concretos por nombre parcial o código. Tolera pequeñas variaciones tipográficas. Úsala cuando el usuario identifica, busca o menciona un producto por nombre. Si luego necesita stock o proveedores, usa el id devuelto para encadenar la tool específica; si hay varias coincidencias ambiguas, no elijas una al azar.",
+        "Busca productos concretos por nombre parcial o código. Tolera pequeñas variaciones tipográficas. Úsala solo cuando el usuario menciona el nombre o el código de un producto: necesita ese texto en consulta y no sirve para contar productos ni para recorrer el catálogo. Si luego necesita stock o proveedores, usa el id devuelto para encadenar la tool específica; si hay varias coincidencias ambiguas, no elijas una al azar.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -60,7 +60,7 @@ export const STORE_READ_TOOL_DEFINITIONS: readonly StoreReadToolDefinition[] = [
     function: {
       name: "listar_productos",
       description:
-        "Lista, filtra, pagina y ordena el catálogo. Úsala para consultas sobre conjuntos o comparaciones: catálogo, activos/inactivos, con/sin stock, mayor stock o menor stock. Para máximos usa orden=stock_desc; para mínimos usa orden=stock_asc. Para rankings usa un tamanoPagina pequeño; para revisar stock bajo consulta activos ordenados por stock_asc y compara stockRegistrado con stockMinimo en los resultados.",
+        "Lista, filtra, pagina y ordena el catálogo cuando hay que ver productos concretos. Para conocer solo totales o conteos usa resumen_inventario. Úsala para conjuntos o comparaciones: catálogo, activos/inactivos, con/sin stock, mayor stock o menor stock. Para comparar por stock usa orden=stock_desc o stock_asc; por precio de venta, orden=precio_desc o precio_asc. tamanoPagina es la cantidad de productos que se devuelven: para los N primeros de un orden usa tamanoPagina=N, con una llamada por cada orden. El resultado indica total, cantidadEntregada, pagina, totalPaginas y hayMasPaginas, y cada producto trae stockBajo calculado con la regla real.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -94,16 +94,16 @@ export const STORE_READ_TOOL_DEFINITIONS: readonly StoreReadToolDefinition[] = [
           tamanoPagina: {
             type: "integer",
             minimum: 1,
-            maximum: 50,
-            default: 20,
+            maximum: 20,
+            default: 10,
             description: "Cantidad máxima de productos en la página.",
           },
           orden: {
             type: "string",
-            enum: ["nombre_asc", "stock_asc", "stock_desc"],
+            enum: ["nombre_asc", "stock_asc", "stock_desc", "precio_asc", "precio_desc"],
             default: "nombre_asc",
             description:
-              "Orden del listado: alfabético, menor stock primero o mayor stock primero.",
+              "Orden del listado: alfabético, menor o mayor stock primero, o menor o mayor precio de venta primero.",
           },
         },
       },
@@ -163,7 +163,7 @@ export const STORE_READ_TOOL_DEFINITIONS: readonly StoreReadToolDefinition[] = [
     function: {
       name: "resumen_inventario",
       description:
-        "Obtiene conteos globales autorizados del inventario: total de productos, activos, sin stock y con stock bajo. Úsala para preguntas globales de cantidad o resumen, aunque el usuario no use exactamente la palabra inventario.",
+        "Obtiene conteos globales autorizados del inventario: total de productos, activos, sin stock y con stock bajo. Es la tool para saber cuántos productos hay en total o en esos estados y para resúmenes generales, aunque el usuario no use la palabra inventario. No recibe argumentos.",
       parameters: {
         type: "object",
         additionalProperties: false,

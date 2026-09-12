@@ -1,5 +1,5 @@
-import type { AppConfig } from "../../config/env.js";
-import type { IntegrationCheckResult } from "../check-result.js";
+import type { AppConfig } from "../config/env.js";
+import type { IntegrationCheckResult } from "./check-result.js";
 
 interface OllamaModel {
   name?: unknown;

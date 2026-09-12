@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 
 import type { AppConfig } from "../../config/env.js";
 import type { IntegrationCheckResult } from "../../integrations/check-result.js";
-import { checkOllamaModel } from "../../integrations/ollama/client.js";
+import { checkOllamaModel } from "../../integrations/ollama-check.js";
 import { checkSupabaseSchema } from "../../integrations/supabase/check.js";
 
 function sendCheckResult(

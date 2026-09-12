@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { classifySupabaseQueryError } from "../integrations/supabase/check.js";
 import {
+  isLowStock,
   StoreGatewayError,
   type InventorySummary,
   type ProductListItem,
@@ -212,6 +213,8 @@ function numericValue(value: number | string): number {
 
 function mapProduct(row: DatabaseProduct): ProductListItem {
   const category = firstRelation(row.categoria);
+  const stockRegistrado = numericValue(row.stock_actual);
+  const stockMinimo = numericValue(row.stock_minimo);
 
   return {
     id: row.id_producto,
@@ -223,9 +226,10 @@ function mapProduct(row: DatabaseProduct): ProductListItem {
     },
     unidadMedida: row.unidad_medida,
     precioVenta: numericValue(row.precio_venta),
-    stockRegistrado: numericValue(row.stock_actual),
-    stockMinimo: numericValue(row.stock_minimo),
+    stockRegistrado,
+    stockMinimo,
     estado: row.estado,
+    stockBajo: isLowStock(row.estado, stockRegistrado, stockMinimo),
   };
 }
 
@@ -399,6 +403,10 @@ export class SupabaseStoreGateway implements StoreGateway {
       request = request.order("stock_actual", { ascending: true });
     } else if (query.orden === "stock_desc") {
       request = request.order("stock_actual", { ascending: false });
+    } else if (query.orden === "precio_asc") {
+      request = request.order("precio_venta", { ascending: true });
+    } else if (query.orden === "precio_desc") {
+      request = request.order("precio_venta", { ascending: false });
     }
 
     const { data, error, count } = await request
@@ -437,14 +445,17 @@ export class SupabaseStoreGateway implements StoreGateway {
     }
 
     const row = data as unknown as DatabaseStock;
+    const stockRegistrado = numericValue(row.stock_actual);
+    const stockMinimo = numericValue(row.stock_minimo);
     return {
       id: row.id_producto,
       codigoReferencia: row.codigo_referencia,
       nombre: row.nombre_producto,
       unidadMedida: row.unidad_medida,
-      stockRegistrado: numericValue(row.stock_actual),
-      stockMinimo: numericValue(row.stock_minimo),
+      stockRegistrado,
+      stockMinimo,
       estado: row.estado,
+      stockBajo: isLowStock(row.estado, stockRegistrado, stockMinimo),
       cantidadVendibleConfirmada: false,
     };
   }

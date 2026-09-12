@@ -20,6 +20,7 @@ export interface ChatProductReference {
   stockRegistrado: number | null;
   stockMinimo: number | null;
   estado: ProductState | null;
+  stockBajo: boolean | null;
 }
 
 export interface ChatListState {
@@ -31,6 +32,7 @@ export interface ChatListState {
   orden: ProductSort;
   pagina: number | null;
   tamanoPagina: number;
+  total: number | null;
   totalPaginas: number | null;
 }
 
@@ -109,6 +111,7 @@ function productReference(product: ProductListItem): ChatProductReference {
     stockRegistrado: product.stockRegistrado,
     stockMinimo: product.stockMinimo,
     estado: product.estado,
+    stockBajo: typeof product.stockBajo === "boolean" ? product.stockBajo : null,
   };
 }
 
@@ -232,6 +235,7 @@ export class ChatSessionMemory {
         orden: "nombre_asc",
         pagina: null,
         tamanoPagina: valueAsInteger(args.limite, 10),
+        total: null,
         totalPaginas: null,
       };
       return;
@@ -257,11 +261,15 @@ export class ChatSessionMemory {
             ? existencia
             : "todos",
         orden:
-          orden === "stock_asc" || orden === "stock_desc"
+          orden === "stock_asc" ||
+          orden === "stock_desc" ||
+          orden === "precio_asc" ||
+          orden === "precio_desc"
             ? orden
             : "nombre_asc",
         pagina: page.pagina,
         tamanoPagina: page.tamanoPagina,
+        total: page.total,
         totalPaginas: page.totalPaginas,
       };
       return;
@@ -276,6 +284,7 @@ export class ChatSessionMemory {
         stockRegistrado: stock.stockRegistrado,
         stockMinimo: stock.stockMinimo,
         estado: stock.estado,
+        stockBajo: typeof stock.stockBajo === "boolean" ? stock.stockBajo : null,
       });
       return;
     }
@@ -289,18 +298,24 @@ export class ChatSessionMemory {
     }
   }
 
+  /*
+   * JSON compacto y sin valores nulos: este contexto acompaña a cada
+   * petición al modelo. Los candidatos solo llevan ordinal, id y nombre
+   * para resolver referencias; el producto seleccionado y el último
+   * listado se conservan completos.
+   */
   trustedContext(): string {
     return JSON.stringify(
       {
         selectedProduct: this.state.selectedProduct,
         candidates: this.state.candidates.slice(0, 20).map((candidate, index) => ({
           ordinal: index + 1,
-          ...candidate,
+          id: candidate.id,
+          nombre: candidate.nombre,
         })),
         lastList: this.state.lastList,
       },
-      null,
-      2,
+      (_key, value: unknown) => (value === null ? undefined : value),
     );
   }
 
@@ -330,6 +345,7 @@ export class ChatSessionMemory {
         values.stockRegistrado ?? known?.stockRegistrado ?? null,
       stockMinimo: values.stockMinimo ?? known?.stockMinimo ?? null,
       estado: values.estado ?? known?.estado ?? null,
+      stockBajo: values.stockBajo ?? known?.stockBajo ?? null,
     };
   }
 }

@@ -7,8 +7,8 @@ La etapa actual establece ocho límites ejecutables:
 1. `config`: valida entorno y evita configuraciones parciales o un modelo distinto al acordado.
 2. `http`: expone salud del proceso y comprobaciones explícitas de integraciones.
 3. `integrations/supabase`: encapsula el SDK de Supabase y no conoce HTTP ni al agente.
-4. `integrations/ollama`: encapsula el protocolo HTTP de Ollama y la comprobación del modelo.
-5. `agent`: ejecuta el ciclo acotado de selección, tools, resultados y respuesta, y conserva estado por sesión.
+4. `integrations/ollama-check.ts`: comprueba la disponibilidad de Ollama y del modelo.
+5. `ai`: ejecuta el ciclo acotado modelo/tools, habla con Ollama por HTTP, contiene el prompt del sistema y conserva estado compacto por sesión.
 6. `store`: define el gateway de tienda e implementa consultas predeterminadas a Supabase.
 7. `tools`: valida entradas cerradas y traduce datos, vacíos y errores a resultados estructurados.
 8. `console`: gestiona entrada oculta, autenticación, conversación libre y cierre de sesiones interactivas.
@@ -58,7 +58,12 @@ Las tools de lectura usan un sobre común equivalente a:
   "status": "ok | empty | invalid_input | not_available | forbidden | error",
   "data": [],
   "meta": {
-    "tamanoPagina": 20
+    "total": 49,
+    "cantidadEntregada": 10,
+    "pagina": 1,
+    "tamanoPagina": 10,
+    "totalPaginas": 5,
+    "hayMasPaginas": true
   },
   "error": null
 }

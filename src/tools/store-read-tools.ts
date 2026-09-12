@@ -260,16 +260,21 @@ export class StoreReadTools {
       const order = optionalEnum(
         parsed,
         "orden",
-        ["nombre_asc", "stock_asc", "stock_desc"] as const,
+        ["nombre_asc", "stock_asc", "stock_desc", "precio_asc", "precio_desc"] as const,
         "nombre_asc",
       );
       const page = optionalInteger(parsed, "pagina", 1, 1, 10_000);
+      /*
+       * Cada producto ocupa ~160 tokens de ministral-3:8b; con
+       * num_ctx=6144 una página mayor de 20 no cabe junto al prompt y
+       * al contexto de la conversación.
+       */
       const pageSize = optionalInteger(
         parsed,
         "tamanoPagina",
-        20,
+        10,
         1,
-        50,
+        20,
       );
 
       const query: {
@@ -293,17 +298,33 @@ export class StoreReadTools {
       }
 
       const result = await this.gateway.listProducts(query);
+      const delivered = result.items.length;
+      const hasMorePages = result.pagina < result.totalPaginas;
       const metadata = {
+        total: result.total,
+        cantidadEntregada: delivered,
         pagina: result.pagina,
         tamanoPagina: result.tamanoPagina,
-        total: result.total,
         totalPaginas: result.totalPaginas,
+        hayMasPaginas: hasMorePages,
+        esListaCompleta: delivered === result.total,
         orden: order,
       };
 
-      return result.items.length === 0
+      /*
+       * El mensaje describe la cobertura real del resultado para que el
+       * modelo no presente una página como el catálogo completo.
+       */
+      return delivered === 0
         ? empty(tool, result, "La página solicitada no contiene productos.", metadata)
-        : success(tool, result, "Productos listados.", metadata);
+        : success(
+            tool,
+            result,
+            delivered === result.total
+              ? `Se entregan los ${delivered} productos que cumplen los filtros.`
+              : `Resultado parcial: se entregan ${delivered} de ${result.total} productos (página ${result.pagina} de ${result.totalPaginas}).`,
+            metadata,
+          );
     } catch (error) {
       return failure(tool, error);
     }

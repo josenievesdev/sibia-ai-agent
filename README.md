@@ -72,7 +72,7 @@ En un checkout limpio, ejecutar `npm run build` antes de `npm start` para genera
 
 `check:admin` solicita credenciales sin mostrar la contraseña, inicia una sesión de usuario y comprueba la lectura de roles y productos bajo RLS. `tools:console` reutiliza el mismo flujo de sesión y permite invocar manualmente `buscar_productos`, `listar_productos`, `consultar_stock`, `consultar_proveedores_producto` y `resumen_inventario`. Ninguno de los dos comandos persiste la sesión.
 
-`chat` solicita las credenciales una sola vez y abre una conversación libre con Ollama. El agente decide cuándo usar las cinco tools, conserva referencias y paginación en memoria, limita cada turno a cinco rondas de tools y termina con `/salir`. La contraseña, las claves y los tokens de Supabase no se envían a Ollama ni se guardan; el cierre afecta solo a la sesión local de la consola.
+`chat` solicita las credenciales una sola vez y abre una conversación libre con Ollama. El agente decide cuándo usar las cinco tools, conserva referencias y paginación en memoria, limita cada turno a seis rondas de tools, acota el contexto enviado a Ollama para no superar `num_ctx` y termina con `/salir`. La contraseña, las claves y los tokens de Supabase no se envían a Ollama ni se guardan; el cierre afecta solo a la sesión local de la consola.
 
 Para comprobar el nuevo proyecto sin escribir secretos en archivos:
 
@@ -112,9 +112,9 @@ Las migraciones ejecutables están en `supabase/migrations`. El orden de SQL Edi
 
 - `src/config`: lectura y validación de variables de entorno.
 - `src/http`: construcción de Fastify, rutas y arranque del servidor.
-- `src/integrations/ollama`: cliente de comprobación de Ollama.
+- `src/ai`: todo lo relacionado directamente con el modelo: ciclo modelo/tools (`sibia-agent.ts`), prompt del sistema (`system-prompt.ts`), cliente HTTP de Ollama (`ollama-client.ts`) y estado compacto de sesión (`session-state.ts`).
+- `src/integrations/ollama-check.ts`: comprobación de disponibilidad de Ollama y del modelo.
 - `src/integrations/supabase`: creación del cliente y comprobación del esquema.
-- `src/agent`: orquestación de Ollama, tools y memoria conversacional acotada.
 - `src/store`: contrato del gateway de tienda y consultas predeterminadas a Supabase.
 - `src/tools`: contratos de entrada cerrados y resultados estructurados para lectura.
 - `src/console`: entrada interactiva, conversación libre y ciclo de vida de sesiones de usuario.

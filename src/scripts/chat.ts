@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { StoreChatAgent } from "../agent/store-chat-agent.js";
+import { StoreChatAgent } from "../ai/sibia-agent.js";
+import { OllamaChatClient } from "../ai/ollama-client.js";
 import { runInteractiveChat } from "../console/interactive-chat.js";
 import { ConsoleInputError } from "../console/interactive-input.js";
 import {
@@ -8,7 +9,6 @@ import {
   withInteractiveSupabaseSession,
 } from "../console/interactive-supabase-session.js";
 import type { AppConfig } from "../config/env.js";
-import { OllamaChatClient } from "../integrations/ollama/chat-client.js";
 import { checkActiveAdminAccess } from "../integrations/supabase/admin-access.js";
 import { SupabaseStoreGateway } from "../store/supabase-store-gateway.js";
 import { StoreReadToolCatalog } from "../tools/store-read-tool-catalog.js";

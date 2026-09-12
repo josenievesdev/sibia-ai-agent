@@ -1,6 +1,11 @@
 export type ProductState = "activo" | "inactivo";
 export type StockFilter = "con_stock" | "sin_stock" | "todos";
-export type ProductSort = "nombre_asc" | "stock_asc" | "stock_desc";
+export type ProductSort =
+  | "nombre_asc"
+  | "precio_asc"
+  | "precio_desc"
+  | "stock_asc"
+  | "stock_desc";
 
 export interface ProductListItem {
   id: string;
@@ -15,6 +20,20 @@ export interface ProductListItem {
   stockRegistrado: number;
   stockMinimo: number;
   estado: ProductState;
+  stockBajo: boolean;
+}
+
+/*
+ * Mismo criterio que public.vista_productos_stock_bajo y que el conteo
+ * de resumen_inventario: producto activo con stock registrado menor o
+ * igual a su stock mínimo.
+ */
+export function isLowStock(
+  estado: ProductState,
+  stockRegistrado: number,
+  stockMinimo: number,
+): boolean {
+  return estado === "activo" && stockRegistrado <= stockMinimo;
 }
 
 export interface ProductListQuery {
@@ -42,6 +61,7 @@ export interface ProductStock {
   stockRegistrado: number;
   stockMinimo: number;
   estado: ProductState;
+  stockBajo: boolean;
   cantidadVendibleConfirmada: false;
 }
 

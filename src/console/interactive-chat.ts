@@ -6,11 +6,12 @@ export interface InteractiveChatAgent {
 
 export async function runInteractiveChat(
   agent: InteractiveChatAgent,
+  ask: (prompt: string) => Promise<string> = askText,
 ): Promise<void> {
   console.log("SIBIA: Sesión iniciada. Escribe /salir para terminar.");
 
   while (true) {
-    const message = await askText("Tú: ");
+    const message = await ask("Tú: ");
     if (message.toLocaleLowerCase("es") === "/salir") {
       console.log("SIBIA: Hasta luego.");
       return;

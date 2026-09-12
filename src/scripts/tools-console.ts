@@ -85,7 +85,7 @@ async function runMenu(
         );
         const page = optionalNumber(await askText("Página (Enter=1): "));
         const pageSize = optionalNumber(
-          await askText("Tamaño de página (1-50, Enter=20): "),
+          await askText("Tamaño de página (1-20, Enter=10): "),
         );
 
         print(
