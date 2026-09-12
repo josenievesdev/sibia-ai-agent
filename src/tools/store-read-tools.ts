@@ -1,8 +1,11 @@
 import {
+  classifyProductMatch,
+  countLowStock,
+  LOW_STOCK_CRITERION,
   StoreGatewayError,
   type InventorySummary,
-  type ProductListItem,
   type ProductPage,
+  type ProductSearchMatch,
   type ProductSort,
   type ProductState,
   type ProductStock,
@@ -200,7 +203,15 @@ function failure<T>(
 export class StoreReadTools {
   constructor(private readonly gateway: StoreGateway) {}
 
-  async buscar_productos(input: unknown): Promise<ToolResult<ProductListItem[]>> {
+  /*
+   * Cada coincidencia viaja etiquetada como exacta o parcial. La
+   * distinción la calcula la capa de datos, no el modelo: un producto
+   * cuyo nombre solo contiene el término dentro de una palabra más
+   * larga no confirma que ese producto exista en el catálogo.
+   */
+  async buscar_productos(
+    input: unknown,
+  ): Promise<ToolResult<ProductSearchMatch[]>> {
     const tool = "buscar_productos";
 
     try {
@@ -209,15 +220,40 @@ export class StoreReadTools {
       const query = requiredString(parsed, "consulta", 100);
       const limit = optionalInteger(parsed, "limite", 10, 1, 20);
       const products = await this.gateway.searchProducts(query, limit);
+      const matches: ProductSearchMatch[] = products.map((product) => ({
+        ...product,
+        coincidencia: classifyProductMatch(
+          query,
+          product.nombre,
+          product.codigoReferencia,
+        ),
+      }));
+      const exactMatches = matches.filter(
+        (match) => match.coincidencia === "exacta",
+      ).length;
+      const metadata = {
+        limite: limit,
+        terminoBuscado: query,
+        cantidad: matches.length,
+        coincidenciasExactas: exactMatches,
+        coincidenciasParciales: matches.length - exactMatches,
+        hayCoincidenciaExacta: exactMatches > 0,
+        productosConStockBajo: countLowStock(matches),
+        criterioStockBajo: LOW_STOCK_CRITERION,
+      };
 
-      return products.length === 0
-        ? empty(tool, [], "No se encontraron productos para la búsqueda.", {
-            limite: limit,
-          })
-        : success(tool, products, "Productos encontrados.", {
-            limite: limit,
-            cantidad: products.length,
-          });
+      if (matches.length === 0) {
+        return empty(tool, [], "No se encontraron productos para la búsqueda.", metadata);
+      }
+
+      return success(
+        tool,
+        matches,
+        exactMatches > 0
+          ? "Coincidencias encontradas; al menos una es exacta con el término buscado."
+          : "Ninguna coincidencia es exacta: el término buscado no existe como producto y estos solo lo contienen dentro de un nombre más largo o se le parecen.",
+        metadata,
+      );
     } catch (error) {
       return failure(tool, error);
     }
@@ -300,6 +336,14 @@ export class StoreReadTools {
       const result = await this.gateway.listProducts(query);
       const delivered = result.items.length;
       const hasMorePages = result.pagina < result.totalPaginas;
+      const firstPosition = (result.pagina - 1) * result.tamanoPagina + 1;
+      /*
+       * La continuación del listado es un dato, no una deducción del
+       * modelo: siguientePagina indica qué página pedir repitiendo
+       * estos mismos filtros, orden y tamaño de página, y las
+       * posiciones globales evitan que una segunda página renumere o
+       * repita elementos de la anterior.
+       */
       const metadata = {
         total: result.total,
         cantidadEntregada: delivered,
@@ -307,8 +351,13 @@ export class StoreReadTools {
         tamanoPagina: result.tamanoPagina,
         totalPaginas: result.totalPaginas,
         hayMasPaginas: hasMorePages,
+        siguientePagina: hasMorePages ? result.pagina + 1 : null,
+        primeraPosicion: delivered === 0 ? null : firstPosition,
+        ultimaPosicion: delivered === 0 ? null : firstPosition + delivered - 1,
         esListaCompleta: delivered === result.total,
         orden: order,
+        productosConStockBajo: countLowStock(result.items),
+        criterioStockBajo: LOW_STOCK_CRITERION,
       };
 
       /*
@@ -348,6 +397,7 @@ export class StoreReadTools {
             tool,
             stock,
             "Stock registrado consultado; no representa cantidad vendible confirmada.",
+            { criterioStockBajo: LOW_STOCK_CRITERION },
           );
     } catch (error) {
       return failure(tool, error);

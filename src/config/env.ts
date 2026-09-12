@@ -1,3 +1,5 @@
+import { DEFAULT_BUSINESS_NAME } from "../ai/system-prompt.js";
+
 export const SIBIA_OLLAMA_MODEL = "ministral-3:8b" as const;
 
 const LOG_LEVELS = [
@@ -18,6 +20,7 @@ export interface SupabaseConfig {
 }
 
 export interface AppConfig {
+  businessName: string;
   host: string;
   port: number;
   logLevel: LogLevel;
@@ -80,6 +83,32 @@ function parseInteger(
 function parseBoolean(environment: NodeJS.ProcessEnv, name: string): boolean {
   const rawValue = optionalValue(environment, name)?.toLowerCase();
   return rawValue === "1" || rawValue === "true";
+}
+
+/*
+ * Nombre del negocio que la consola muestra en la bienvenida y que el
+ * prompt del sistema usa para que SIBIA se identifique igual. Se
+ * limpian los saltos de línea y los caracteres de control porque el
+ * valor se imprime en la consola y viaja dentro del prompt.
+ */
+const MAX_BUSINESS_NAME_CHARACTERS = 60;
+
+function parseBusinessName(environment: NodeJS.ProcessEnv): string {
+  const rawValue = optionalValue(environment, "SIBIA_BUSINESS_NAME");
+  if (rawValue === undefined) {
+    return DEFAULT_BUSINESS_NAME;
+  }
+
+  const value = rawValue.replace(/[\p{C}]+/gu, " ").replace(/\s+/gu, " ").trim();
+  if (value === "") {
+    return DEFAULT_BUSINESS_NAME;
+  }
+  if (value.length > MAX_BUSINESS_NAME_CHARACTERS) {
+    throw new ConfigurationError(
+      `SIBIA_BUSINESS_NAME no puede superar ${MAX_BUSINESS_NAME_CHARACTERS} caracteres.`,
+    );
+  }
+  return value;
 }
 
 function parseHttpUrl(name: string, value: string): string {
@@ -201,6 +230,7 @@ export function loadConfig(
   }
 
   return {
+    businessName: parseBusinessName(environment),
     host: valueOrDefault(environment, "APP_HOST", "127.0.0.1"),
     port: parseInteger(environment, "PORT", 3000, 1, 65_535),
     logLevel: parseLogLevel(environment),

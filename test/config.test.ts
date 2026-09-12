@@ -54,3 +54,21 @@ test("rejects legacy service_role JWTs", () => {
     ConfigurationError,
   );
 });
+
+test("SIBIA_BUSINESS_NAME configura el negocio y cae en un valor neutro", () => {
+  assert.equal(loadConfig({}).businessName, "esta tienda");
+  assert.equal(loadConfig({ SIBIA_BUSINESS_NAME: "   " }).businessName, "esta tienda");
+  assert.equal(
+    loadConfig({ SIBIA_BUSINESS_NAME: "  Tienda La Esquina  " }).businessName,
+    "Tienda La Esquina",
+  );
+  /* El valor se imprime y viaja en el prompt: sin saltos de línea. */
+  assert.equal(
+    loadConfig({ SIBIA_BUSINESS_NAME: "Tienda\nLa Esquina" }).businessName,
+    "Tienda La Esquina",
+  );
+  assert.throws(
+    () => loadConfig({ SIBIA_BUSINESS_NAME: "N".repeat(61) }),
+    ConfigurationError,
+  );
+});

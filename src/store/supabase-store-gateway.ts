@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifySupabaseQueryError } from "../integrations/supabase/check.js";
 import {
   isLowStock,
+  LOW_STOCK_CRITERION,
+  normalizeStoreText,
   StoreGatewayError,
   type InventorySummary,
   type ProductListItem,
@@ -91,18 +93,8 @@ const SEARCH_STOP_WORDS = new Set([
   "del",
 ]);
 
-function normalizeSearchText(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLocaleLowerCase("es")
-    .replace(/[^a-z0-9]+/gu, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
-}
-
 function searchTokens(value: string): string[] {
-  return normalizeSearchText(value)
+  return normalizeStoreText(value)
     .split(" ")
     .filter((token) => token !== "" && !SEARCH_STOP_WORDS.has(token));
 }
@@ -572,8 +564,7 @@ export class SupabaseStoreGateway implements StoreGateway {
       productosActivos: active.count ?? 0,
       productosSinStock: withoutStock.count ?? 0,
       productosConStockBajo: lowStock.count ?? 0,
-      criterioStockBajo:
-        "activo_y_stock_registrado_menor_o_igual_al_minimo",
+      criterioStockBajo: LOW_STOCK_CRITERION,
     };
   }
 }

@@ -32,8 +32,10 @@ async function startChat(
   const ollama = new OllamaChatClient({ ...config.ollama, debug });
   const tools = new StoreReadTools(new SupabaseStoreGateway(client));
   const catalog = new StoreReadToolCatalog(tools);
-  const agent = new StoreChatAgent(ollama, catalog);
-  await runInteractiveChat(agent);
+  const agent = new StoreChatAgent(ollama, catalog, {
+    businessName: config.businessName,
+  });
+  await runInteractiveChat(agent, { businessName: config.businessName });
 }
 
 try {

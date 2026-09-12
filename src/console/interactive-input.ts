@@ -17,6 +17,53 @@ export function ensureInteractiveConsole(): void {
   }
 }
 
+export interface ConsoleReader {
+  ask(prompt: string): Promise<string>;
+  close(): void;
+}
+
+/*
+ * Lector de una sola interfaz de readline para toda la sesión. Abrir y
+ * cerrar una interfaz por cada línea deja stdin en pausa entre
+ * preguntas y una línea vacía puede terminar la entrada: aquí la
+ * interfaz vive mientras dura el chat y solo se cierra al salir.
+ */
+export function createConsoleReader(): ConsoleReader {
+  const terminal = createInterface({ input: stdin, output: stdout });
+  let finished = false;
+
+  const finishedInput = new Promise<never>((_resolve, reject) => {
+    terminal.once("SIGINT", () => {
+      finished = true;
+      terminal.close();
+      reject(new ConsoleInputError("Operación cancelada."));
+    });
+    terminal.once("close", () => {
+      finished = true;
+      reject(new ConsoleInputError("La entrada de la consola terminó."));
+    });
+  });
+  /* Nadie espera esta promesa cuando el cierre es voluntario. */
+  finishedInput.catch(() => undefined);
+
+  return {
+    async ask(prompt: string): Promise<string> {
+      if (finished) {
+        throw new ConsoleInputError("La entrada de la consola terminó.");
+      }
+      return (
+        await Promise.race([terminal.question(prompt), finishedInput])
+      ).trim();
+    },
+    close(): void {
+      if (!finished) {
+        finished = true;
+        terminal.close();
+      }
+    },
+  };
+}
+
 export async function askText(prompt: string): Promise<string> {
   const terminal = createInterface({ input: stdin, output: stdout });
   const cancellation = new Promise<never>((_resolve, reject) => {

@@ -1,11 +1,12 @@
-import type {
-  ProductListItem,
-  ProductPage,
-  ProductSort,
-  ProductState,
-  ProductStock,
-  ProductSuppliers,
-  StockFilter,
+import {
+  normalizeStoreText,
+  type ProductListItem,
+  type ProductPage,
+  type ProductSort,
+  type ProductState,
+  type ProductStock,
+  type ProductSuppliers,
+  type StockFilter,
 } from "../store/store-gateway.js";
 import type { StoreToolCallResult } from "../tools/store-read-tool-catalog.js";
 
@@ -29,11 +30,12 @@ export interface ChatListState {
   categoriaId: string | null;
   estado: ProductState | "todos";
   existencia: StockFilter;
-  orden: ProductSort;
+  orden: ProductSort | null;
   pagina: number | null;
   tamanoPagina: number;
   total: number | null;
   totalPaginas: number | null;
+  siguientePagina: number | null;
 }
 
 export interface ChatSessionState {
@@ -41,6 +43,12 @@ export interface ChatSessionState {
   selectedProduct: ChatProductReference | null;
   lastList: ChatListState | null;
 }
+
+/*
+ * Como máximo veinte posiciones referenciables: es el mayor listado que
+ * una tool puede entregar y lo que cabe en el contexto de sesión.
+ */
+const MAX_CANDIDATES = 20;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -80,15 +88,36 @@ const ORDINALS: Readonly<Record<string, number>> = {
   decima: 10,
 };
 
-function ordinalFromMessage(message: string): number | null {
+const LAST_POSITION = /(?:^|\b)(?:el|la)?\s*(?:ultimo|ultima)(?:\b|$)/u;
+
+/*
+ * Un número solo señala una posición cuando el usuario lo escribe como
+ * posición: "el 2", "la opción 3". Un número suelto pertenece al
+ * producto o a la cantidad pedida ("muéstrame 5 productos",
+ * "Coca Cola 1.5L") y no selecciona nada.
+ */
+const POSITIONAL_NUMBER =
+  /(?:^|\b)(?:el|la|opcion|numero|posicion|item)\s+([1-9][0-9]?)(?!\s*[0-9])(?:\b|$)/u;
+
+/*
+ * Resuelve una referencia posicional del usuario. No interpreta la
+ * intención ni decide la respuesta: solo traduce "el segundo" o "el
+ * último" a una posición de la lista que ya se mostró, para que el
+ * backend pueda validar el producto que el modelo pide después.
+ */
+function positionFromMessage(message: string, shownCount: number): number | null {
   const value = normalize(message);
   if (value.includes("pagina")) {
     return null;
   }
 
-  const numeric = value.match(/(?:^|\b)(?:el|la|opcion|producto)?\s*([1-9][0-9]?)(?:\b|$)/u)?.[1];
-  if (numeric !== undefined) {
-    return Number(numeric);
+  if (shownCount > 0 && LAST_POSITION.test(value)) {
+    return shownCount;
+  }
+
+  const positional = value.match(POSITIONAL_NUMBER)?.[1];
+  if (positional !== undefined) {
+    return Number(positional);
   }
 
   for (const [word, ordinal] of Object.entries(ORDINALS)) {
@@ -97,6 +126,18 @@ function ordinalFromMessage(message: string): number | null {
     }
   }
   return null;
+}
+
+function namesProduct(
+  normalizedMessage: string,
+  candidate: ChatProductReference,
+): boolean {
+  const name = normalizeStoreText(candidate.nombre);
+  const code = normalizeStoreText(candidate.codigoReferencia ?? "");
+  return (
+    (name !== "" && normalizedMessage.includes(name)) ||
+    (code !== "" && normalizedMessage.includes(code))
+  );
 }
 
 function productReference(product: ProductListItem): ChatProductReference {
@@ -119,12 +160,90 @@ function valueAsInteger(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) ? value : fallback;
 }
 
+/*
+ * Referencias válidas durante un turno. El marco posicional se fija al
+ * empezar el turno con la lista que el usuario acaba de ver: si dentro
+ * del mismo turno el modelo vuelve a consultar y recibe otro orden,
+ * "el segundo" sigue señalando al segundo producto que se mostró.
+ */
+export class TurnReferences {
+  private readonly deliveredProductIds = new Set<string>();
+  private readonly deliveredCategoryIds = new Set<string>();
+  /*
+   * Páginas de listado ya entregadas en este turno, por firma de
+   * filtros, orden y número de página, con el tamaño real con el que
+   * se entregaron.
+   */
+  private readonly deliveredPages = new Map<string, number>();
+
+  constructor(
+    readonly position: number | null,
+    readonly positionTarget: ChatProductReference | null,
+    private readonly knownProductIds: ReadonlySet<string>,
+    private readonly knownCategoryIds: ReadonlySet<string>,
+    private readonly userIds: ReadonlySet<string>,
+  ) {}
+
+  allowsProduct(id: string): boolean {
+    const value = id.toLowerCase();
+    if (this.userIds.has(value)) {
+      return true;
+    }
+    /*
+     * Una posición resuelta es exclusiva: el usuario señaló un lugar
+     * concreto de la lista mostrada y ningún otro producto responde a
+     * esa referencia, aunque el modelo haya reordenado los resultados.
+     */
+    if (this.positionTarget !== null) {
+      return this.positionTarget.id.toLowerCase() === value;
+    }
+    return (
+      this.knownProductIds.has(value) || this.deliveredProductIds.has(value)
+    );
+  }
+
+  allowsCategory(id: string): boolean {
+    const value = id.toLowerCase();
+    return (
+      this.userIds.has(value) ||
+      this.knownCategoryIds.has(value) ||
+      this.deliveredCategoryIds.has(value)
+    );
+  }
+
+  deliveredPageSize(signature: string): number | null {
+    return this.deliveredPages.get(signature) ?? null;
+  }
+
+  recordListPage(signature: string, tamanoPagina: number): void {
+    if (!this.deliveredPages.has(signature)) {
+      this.deliveredPages.set(signature, tamanoPagina);
+    }
+  }
+
+  recordDelivered(products: readonly ChatProductReference[]): void {
+    for (const product of products) {
+      this.deliveredProductIds.add(product.id.toLowerCase());
+      if (product.categoriaId !== null) {
+        this.deliveredCategoryIds.add(product.categoriaId.toLowerCase());
+      }
+    }
+  }
+}
+
 export class ChatSessionMemory {
   private readonly state: ChatSessionState = {
     candidates: [],
     selectedProduct: null,
     lastList: null,
   };
+
+  /*
+   * Productos entregados por las tools del turno en curso, en el mismo
+   * orden en que las tools los devolvieron. Al cerrar el turno pasan a
+   * ser la lista referenciable, porque es la que el modelo presenta.
+   */
+  private delivered: ChatProductReference[] | null = null;
 
   snapshot(): ChatSessionState {
     return {
@@ -138,83 +257,130 @@ export class ChatSessionMemory {
     };
   }
 
-  applyExplicitSelection(message: string): void {
-    if (this.state.candidates.length === 0) {
+  /*
+   * Abre el turno: fija el marco posicional sobre la lista mostrada y
+   * devuelve las referencias con las que el backend validará los
+   * argumentos de las tools de este turno.
+   */
+  beginTurn(message: string, userIds: ReadonlySet<string>): TurnReferences {
+    this.delivered = null;
+
+    const shown = this.state.candidates;
+    const position = positionFromMessage(message, shown.length);
+    const positionTarget =
+      position === null ? null : (shown[position - 1] ?? null);
+
+    if (positionTarget !== null) {
+      this.state.selectedProduct = { ...positionTarget };
+    } else {
+      const normalizedMessage = normalizeStoreText(message);
+      const named = shown.filter((candidate) =>
+        namesProduct(normalizedMessage, candidate),
+      );
+      if (named.length === 1) {
+        this.state.selectedProduct = { ...named[0]! };
+      }
+    }
+
+    const knownProductIds = new Set<string>();
+    if (this.state.selectedProduct !== null) {
+      knownProductIds.add(this.state.selectedProduct.id.toLowerCase());
+    }
+    if (shown.length === 1) {
+      knownProductIds.add(shown[0]!.id.toLowerCase());
+    }
+
+    const knownCategoryIds = new Set<string>();
+    for (const candidate of shown) {
+      if (candidate.categoriaId !== null) {
+        knownCategoryIds.add(candidate.categoriaId.toLowerCase());
+      }
+    }
+    const selectedCategoryId = this.state.selectedProduct?.categoriaId;
+    if (selectedCategoryId !== undefined && selectedCategoryId !== null) {
+      knownCategoryIds.add(selectedCategoryId.toLowerCase());
+    }
+    const listCategoryId = this.state.lastList?.categoriaId;
+    if (listCategoryId !== undefined && listCategoryId !== null) {
+      knownCategoryIds.add(listCategoryId.toLowerCase());
+    }
+
+    return new TurnReferences(
+      position,
+      positionTarget,
+      knownProductIds,
+      knownCategoryIds,
+      userIds,
+    );
+  }
+
+  /*
+   * Cierra el turno. La lista referenciable pasa a ser exactamente lo
+   * que las tools entregaron, en su orden de entrega; si el turno no
+   * entregó ninguna lista, se conserva la anterior.
+   */
+  endTurn(): void {
+    const delivered = this.delivered;
+    this.delivered = null;
+    if (delivered === null) {
       return;
     }
 
-    const ordinal = ordinalFromMessage(message);
-    if (ordinal !== null) {
-      const candidate = this.state.candidates[ordinal - 1];
-      if (candidate !== undefined) {
-        this.state.selectedProduct = { ...candidate };
-        return;
+    this.state.candidates = delivered.slice(0, MAX_CANDIDATES);
+    const selectedId = this.state.selectedProduct?.id ?? null;
+    const single =
+      this.state.candidates.length === 1 ? this.state.candidates[0]! : null;
+
+    if (single !== null) {
+      if (selectedId !== single.id) {
+        this.state.selectedProduct = { ...single };
       }
+      return;
     }
-
-    const normalizedMessage = normalize(message);
-    const exactMatches = this.state.candidates.filter((candidate) => {
-      const normalizedName = normalize(candidate.nombre);
-      const normalizedCode = normalize(candidate.codigoReferencia ?? "");
-      return (
-        (normalizedName !== "" && normalizedMessage.includes(normalizedName)) ||
-        (normalizedCode !== "" && normalizedMessage.includes(normalizedCode))
-      );
-    });
-
-    if (exactMatches.length === 1) {
-      this.state.selectedProduct = { ...exactMatches[0]! };
+    /*
+     * Una selección solo sobrevive a una lista nueva si ese producto
+     * sigue estando en ella; en otro caso el usuario ya no tiene
+     * delante aquello a lo que se refería.
+     */
+    if (
+      selectedId !== null &&
+      !this.state.candidates.some((candidate) => candidate.id === selectedId)
+    ) {
+      this.state.selectedProduct = null;
     }
   }
 
-  allowedProductIds(message: string): ReadonlySet<string> {
-    const ids = new Set<string>();
-    if (this.state.selectedProduct !== null) {
-      ids.add(this.state.selectedProduct.id.toLowerCase());
-    }
-    if (this.state.candidates.length === 1) {
-      ids.add(this.state.candidates[0]!.id.toLowerCase());
-    }
-
-    const ordinal = ordinalFromMessage(message);
-    if (ordinal !== null) {
-      const candidate = this.state.candidates[ordinal - 1];
-      if (candidate !== undefined) {
-        ids.add(candidate.id.toLowerCase());
-      }
+  /*
+   * Argumentos canónicos del último listado paginado. Una continuación
+   * los repite tal cual y solo cambia la página, de modo que el
+   * tamaño, el orden y los filtros no puedan variar entre páginas de
+   * un mismo listado. Devuelve null si el último listado no vino de
+   * listar_productos y por tanto no hay nada que continuar.
+   */
+  continuationArguments(): Record<string, unknown> | null {
+    const list = this.state.lastList;
+    if (list === null || list.source !== "listar_productos" || list.orden === null) {
+      return null;
     }
 
-    const normalizedMessage = normalize(message);
-    for (const candidate of this.state.candidates) {
-      const name = normalize(candidate.nombre);
-      const code = normalize(candidate.codigoReferencia ?? "");
-      if (
-        (name !== "" && normalizedMessage.includes(name)) ||
-        (code !== "" && normalizedMessage.includes(code))
-      ) {
-        ids.add(candidate.id.toLowerCase());
-      }
+    const args: Record<string, unknown> = {
+      estado: list.estado,
+      existencia: list.existencia,
+      orden: list.orden,
+      tamanoPagina: list.tamanoPagina,
+    };
+    if (list.categoriaId !== null) {
+      args.categoriaId = list.categoriaId;
     }
-    return ids;
+    return args;
   }
 
-  allowedCategoryIds(): ReadonlySet<string> {
-    const ids = new Set<string>();
-    for (const candidate of this.state.candidates) {
-      if (candidate.categoriaId !== null) {
-        ids.add(candidate.categoriaId.toLowerCase());
-      }
-    }
-    if (this.state.selectedProduct?.categoriaId !== null && this.state.selectedProduct?.categoriaId !== undefined) {
-      ids.add(this.state.selectedProduct.categoriaId.toLowerCase());
-    }
-    if (this.state.lastList?.categoriaId !== null && this.state.lastList?.categoriaId !== undefined) {
-      ids.add(this.state.lastList.categoriaId.toLowerCase());
-    }
-    return ids;
-  }
-
-  update(name: string, argumentsValue: unknown, result: StoreToolCallResult): void {
+  update(
+    name: string,
+    argumentsValue: unknown,
+    result: StoreToolCallResult,
+    references: TurnReferences | null = null,
+  ): void {
     if (result.status !== "ok" && result.status !== "empty") {
       return;
     }
@@ -225,18 +391,19 @@ export class ChatSessionMemory {
       const products = Array.isArray(result.data)
         ? (result.data as ProductListItem[])
         : [];
-      this.replaceCandidates(products);
+      this.addDelivered(products, references);
       this.state.lastList = {
         source: "buscar_productos",
         consulta: typeof args.consulta === "string" ? args.consulta : null,
         categoriaId: null,
         estado: "todos",
         existencia: "todos",
-        orden: "nombre_asc",
+        orden: null,
         pagina: null,
         tamanoPagina: valueAsInteger(args.limite, 10),
         total: null,
         totalPaginas: null,
+        siguientePagina: null,
       };
       return;
     }
@@ -246,7 +413,7 @@ export class ChatSessionMemory {
       if (page === null || !Array.isArray(page.items)) {
         return;
       }
-      this.replaceCandidates(page.items);
+      this.addDelivered(page.items, references);
       const estado = args.estado;
       const existencia = args.existencia;
       const orden = args.orden;
@@ -271,6 +438,8 @@ export class ChatSessionMemory {
         tamanoPagina: page.tamanoPagina,
         total: page.total,
         totalPaginas: page.totalPaginas,
+        siguientePagina:
+          page.pagina < page.totalPaginas ? page.pagina + 1 : null,
       };
       return;
     }
@@ -300,16 +469,33 @@ export class ChatSessionMemory {
 
   /*
    * JSON compacto y sin valores nulos: este contexto acompaña a cada
-   * petición al modelo. Los candidatos solo llevan ordinal, id y nombre
-   * para resolver referencias; el producto seleccionado y el último
-   * listado se conservan completos.
+   * petición al modelo. Solo identifica: posición, id, nombre, código y
+   * categoría. El stock, el precio y el estado quedan fuera a propósito,
+   * porque cambian y el modelo debe volver a consultarlos con la tool
+   * en lugar de leerlos aquí. El estado completo sigue disponible para
+   * el backend en snapshot().
    */
   trustedContext(): string {
+    const selected = this.state.selectedProduct;
+    const selectedPosition = this.state.candidates.findIndex(
+      (candidate) => candidate.id === selected?.id,
+    );
+
     return JSON.stringify(
       {
-        selectedProduct: this.state.selectedProduct,
-        candidates: this.state.candidates.slice(0, 20).map((candidate, index) => ({
-          ordinal: index + 1,
+        selectedProduct:
+          selected === null
+            ? null
+            : {
+                posicion: selectedPosition === -1 ? null : selectedPosition + 1,
+                id: selected.id,
+                nombre: selected.nombre,
+                codigoReferencia: selected.codigoReferencia,
+                categoriaId: selected.categoriaId,
+                categoriaNombre: selected.categoriaNombre,
+              },
+        candidates: this.state.candidates.map((candidate, index) => ({
+          posicion: index + 1,
           id: candidate.id,
           nombre: candidate.nombre,
         })),
@@ -319,12 +505,20 @@ export class ChatSessionMemory {
     );
   }
 
-  private replaceCandidates(products: readonly ProductListItem[]): void {
-    this.state.candidates = products.map(productReference);
-    this.state.selectedProduct =
-      this.state.candidates.length === 1
-        ? { ...this.state.candidates[0]! }
-        : null;
+  private addDelivered(
+    products: readonly ProductListItem[],
+    references: TurnReferences | null,
+  ): void {
+    const delivered = this.delivered ?? [];
+    const known = new Set(delivered.map((product) => product.id));
+    for (const product of products) {
+      if (!known.has(product.id)) {
+        known.add(product.id);
+        delivered.push(productReference(product));
+      }
+    }
+    this.delivered = delivered;
+    references?.recordDelivered(delivered);
   }
 
   private selectKnownProduct(

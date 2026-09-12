@@ -7,6 +7,7 @@ import {
   type ChatCompletionClient,
 } from "../src/ai/sibia-agent.js";
 import {
+  inspectAssistantText,
   OllamaChatClient,
   OllamaChatError,
   type OllamaAssistantMessage,
@@ -15,15 +16,24 @@ import {
 } from "../src/ai/ollama-client.js";
 import {
   BACKEND_NOTICE_PREFIX,
+  buildSibiaSystemPrompt,
   SIBIA_SYSTEM_PROMPT,
 } from "../src/ai/system-prompt.js";
-import { runInteractiveChat } from "../src/console/interactive-chat.js";
-import type {
-  InventorySummary,
-  ProductListItem,
-  ProductListQuery,
-  ProductPage,
-  StoreGateway,
+import {
+  runInteractiveChat,
+  welcomeBanner,
+} from "../src/console/interactive-chat.js";
+import {
+  classifyProductMatch,
+  countLowStock,
+  isLowStock,
+  LOW_STOCK_CRITERION,
+  type InventorySummary,
+  type ProductListItem,
+  type ProductListQuery,
+  type ProductPage,
+  type ProductSearchMatch,
+  type StoreGateway,
 } from "../src/store/store-gateway.js";
 import {
   STORE_READ_TOOL_DEFINITIONS,
@@ -545,7 +555,9 @@ test("la consola entrega al modelo todo mensaje distinto de /salir", async (t) =
     inputs.slice(0, 4).map((_, index) => assistant(`Respuesta ${index + 1}`)),
   );
 
-  await runInteractiveChat(agent, async () => inputs.shift() ?? "/salir");
+  await runInteractiveChat(agent, {
+    ask: async () => inputs.shift() ?? "/salir",
+  });
 
   assert.deepEqual(
     model.seen.map((messages) => messages.at(-1)?.content),
@@ -746,11 +758,16 @@ test("un listado paginado declara que es parcial y no la lista completa", async 
     tamanoPagina: 10,
     totalPaginas: 5,
     hayMasPaginas: true,
+    siguientePagina: 2,
+    primeraPosicion: 1,
+    ultimaPosicion: 10,
     esListaCompleta: false,
     orden: "nombre_asc",
+    productosConStockBajo: 1,
+    criterioStockBajo: LOW_STOCK_CRITERION,
   });
   assert.match(result.message, /parcial.*10 de 49/u);
-  assert.match(SIBIA_SYSTEM_PROMPT, /nunca lo presentes como la lista o el catálogo completo/u);
+  assert.match(SIBIA_SYSTEM_PROMPT, /nunca lo presentes como el catálogo completo/u);
 });
 
 test("el ordenamiento permite obtener los dos productos con más y con menos stock", async () => {
@@ -972,5 +989,698 @@ test("la capa de IA no contiene clasificadores de intención ni renderizadores",
       /intent|presentation|grounded|render|classifier/iu.test(String(file)),
     ),
     false,
+  );
+});
+
+/*
+ * Pruebas de la pasada de corrección. Todos los productos son
+ * sintéticos: ninguna regla del backend depende de un nombre concreto.
+ */
+
+const SYNTHETIC_IDS = Array.from(
+  { length: 12 },
+  (_, index) => `b0000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+);
+
+function syntheticProduct(
+  index: number,
+  overrides: Partial<ProductListItem> = {},
+): ProductListItem {
+  const stock = 10 + index;
+  return {
+    id: SYNTHETIC_IDS[index]!,
+    codigoReferencia: `SX-${String(index + 1).padStart(2, "0")}`,
+    nombre: `Artículo Sintético ${String(index + 1).padStart(2, "0")}`,
+    categoria: { id: "c0000002-0000-4000-8000-000000000002", nombre: "Prueba" },
+    unidadMedida: "unidad",
+    precioVenta: 1_500 + index * 10,
+    stockRegistrado: stock,
+    stockMinimo: 2,
+    estado: "activo",
+    stockBajo: isLowStock("activo", stock, 2),
+    ...overrides,
+  };
+}
+
+/*
+ * Gateway de doce productos con un orden total y estable: nombre y,
+ * como desempate, id. Sirve para comprobar que tres páginas seguidas no
+ * repiten ni se saltan elementos.
+ */
+class PaginatedGateway implements StoreGateway {
+  readonly listQueries: ProductListQuery[] = [];
+  readonly products: ProductListItem[];
+
+  constructor(products: readonly ProductListItem[]) {
+    this.products = [...products].sort((left, right) => {
+      const byName = left.nombre.localeCompare(right.nombre, "es", {
+        sensitivity: "base",
+      });
+      return byName !== 0 ? byName : left.id.localeCompare(right.id);
+    });
+  }
+
+  async listProducts(query: ProductListQuery): Promise<ProductPage> {
+    this.listQueries.push({ ...query });
+    const first = (query.pagina - 1) * query.tamanoPagina;
+    return {
+      items: this.products.slice(first, first + query.tamanoPagina),
+      pagina: query.pagina,
+      tamanoPagina: query.tamanoPagina,
+      total: this.products.length,
+      totalPaginas: Math.ceil(this.products.length / query.tamanoPagina),
+    };
+  }
+
+  async searchProducts(): Promise<ProductListItem[]> {
+    return [];
+  }
+
+  async getProductStock(): Promise<null> {
+    return null;
+  }
+
+  async getProductSuppliers(): Promise<null> {
+    return null;
+  }
+
+  async getInventorySummary(): Promise<InventorySummary> {
+    return {
+      totalProductos: this.products.length,
+      productosActivos: this.products.length,
+      productosSinStock: 0,
+      productosConStockBajo: countLowStock(this.products),
+      criterioStockBajo: LOW_STOCK_CRITERION,
+    };
+  }
+}
+
+test("caso 1: «el segundo» señala la posición mostrada, no la que el modelo elija", async () => {
+  const shown = [syntheticProduct(0), syntheticProduct(1), syntheticProduct(2)];
+  const { agent, catalog } = agentWith(
+    [
+      assistant("", [toolCall("buscar_productos", { consulta: "articulo" })]),
+      assistant("1. Artículo Sintético 01\n2. Artículo Sintético 02\n3. Artículo Sintético 03"),
+      /* El modelo pide el tercero cuando el usuario dijo "el segundo". */
+      assistant("", [toolCall("consultar_stock", { productoId: shown[2]!.id })]),
+      assistant("", [toolCall("consultar_stock", { productoId: shown[1]!.id })]),
+      assistant("El segundo es Artículo Sintético 02 y tiene 11 unidades registradas."),
+    ],
+    {
+      buscar_productos: () => ok("buscar_productos", shown),
+      consultar_stock: (args) => {
+        const id = (args as { productoId: string }).productoId;
+        const found = shown.find((item) => item.id === id)!;
+        return ok("consultar_stock", {
+          id: found.id,
+          codigoReferencia: found.codigoReferencia,
+          nombre: found.nombre,
+          unidadMedida: found.unidadMedida,
+          stockRegistrado: found.stockRegistrado,
+          stockMinimo: found.stockMinimo,
+          estado: found.estado,
+          stockBajo: found.stockBajo,
+          cantidadVendibleConfirmada: false,
+        });
+      },
+    },
+  );
+
+  await agent.respond("Muéstrame tres artículos");
+  const turn = await agent.respond("¿Cuánto stock tiene el segundo?");
+
+  /*
+   * El modelo intentó dos productos; solo el de la posición 2 llegó a
+   * ejecutarse contra el catálogo.
+   */
+  assert.deepEqual(
+    turn.toolResults.map(
+      (execution) => (execution.arguments as { productoId: string }).productoId,
+    ),
+    [shown[2]!.id, shown[1]!.id],
+  );
+  assert.deepEqual(
+    catalog.executed
+      .filter((execution) => execution.name === "consultar_stock")
+      .map((execution) => (execution.arguments as { productoId: string }).productoId),
+    [shown[1]!.id],
+  );
+  const rejection = turn.toolResults[0]?.result;
+  assert.equal(rejection?.status, "invalid_input");
+  assert.equal(rejection?.error?.code, "UNTRUSTED_ENTITY_REFERENCE");
+  assert.match(String(rejection?.message), /posición 2/u);
+  assert.match(String(rejection?.message), new RegExp(shown[1]!.nombre, "u"));
+  assert.equal(turn.toolResults[1]?.result.status, "ok");
+  assert.equal(turn.state.selectedProduct?.id, shown[1]!.id);
+});
+
+test("caso 1b: un reordenamiento del modelo dentro del turno no mueve la posición", async () => {
+  const shown = Array.from({ length: 4 }, (_, index) => syntheticProduct(index));
+  const reordered = [...shown].reverse();
+  assert.notEqual(reordered[1]!.id, shown[1]!.id);
+  const { agent } = agentWith(
+    [
+      assistant("", [toolCall("buscar_productos", { consulta: "articulo" })]),
+      assistant("1. Artículo Sintético 01\n2. Artículo Sintético 02\n3. Artículo Sintético 03\n4. Artículo Sintético 04"),
+      assistant("", [toolCall("buscar_productos", { consulta: "articulo sintetico" })]),
+      /* Segunda posición de la lista nueva, distinta de la mostrada. */
+      assistant("", [toolCall("consultar_stock", { productoId: reordered[1]!.id })]),
+      assistant("Me refiero a Artículo Sintético 02, el segundo que te mostré."),
+    ],
+    {
+      buscar_productos: (args) =>
+        ok(
+          "buscar_productos",
+          (args as { consulta: string }).consulta === "articulo" ? shown : reordered,
+        ),
+      consultar_stock: () => ok("consultar_stock", { id: reordered[1]!.id }),
+    },
+  );
+
+  await agent.respond("Muéstrame cuatro artículos");
+  const turn = await agent.respond("Dame el stock del segundo");
+
+  const stockResult = turn.toolResults.find(
+    (execution) => execution.name === "consultar_stock",
+  )?.result;
+  assert.equal(stockResult?.status, "invalid_input");
+  assert.match(String(stockResult?.message), new RegExp(shown[1]!.nombre, "u"));
+});
+
+test("caso 1c: un número suelto de la consulta no selecciona una posición", async () => {
+  const shown = Array.from({ length: 5 }, (_, index) => syntheticProduct(index));
+  const { agent } = agentWith(
+    [
+      assistant("", [toolCall("buscar_productos", { consulta: "articulo" })]),
+      assistant("Te muestro cinco artículos."),
+      assistant("", [toolCall("consultar_stock", { productoId: shown[3]!.id })]),
+      assistant("Ese artículo tiene stock registrado."),
+    ],
+    {
+      buscar_productos: () => ok("buscar_productos", shown),
+      consultar_stock: () => ok("consultar_stock", { id: shown[3]!.id }),
+    },
+  );
+
+  await agent.respond("Muéstrame 5 artículos");
+  const turn = await agent.respond("Dame el stock del Artículo Sintético 04");
+
+  assert.equal(turn.toolResults[0]?.result.status, "ok");
+});
+
+test("caso 2: stock 6 con mínimo 2 no es stock bajo en ninguna capa", async () => {
+  const holgado = syntheticProduct(0, {
+    stockRegistrado: 6,
+    stockMinimo: 2,
+    stockBajo: isLowStock("activo", 6, 2),
+  });
+  const escaso = syntheticProduct(1, {
+    stockRegistrado: 2,
+    stockMinimo: 2,
+    stockBajo: isLowStock("activo", 2, 2),
+  });
+
+  assert.equal(isLowStock("activo", 6, 2), false);
+  assert.equal(isLowStock("activo", 2, 2), true);
+  assert.equal(holgado.stockBajo, false);
+
+  const tools = new StoreReadTools(new PaginatedGateway([holgado, escaso]));
+
+  const listed = await tools.listar_productos({ tamanoPagina: 5 });
+  assert.equal(listed.meta.productosConStockBajo, 1);
+  assert.equal(listed.meta.criterioStockBajo, LOW_STOCK_CRITERION);
+  assert.deepEqual(
+    (listed.data as ProductPage).items.map((item) => item.stockBajo),
+    [false, true],
+  );
+
+  const summary = await tools.resumen_inventario();
+  assert.equal((summary.data as InventorySummary).productosConStockBajo, 1);
+
+  /* El modelo no puede reinterpretar la regla desde los dos números. */
+  assert.match(
+    SIBIA_SYSTEM_PROMPT,
+    /Solo dices que un producto tiene stock bajo cuando su stockBajo es true/u,
+  );
+  assert.match(SIBIA_SYSTEM_PROMPT, /cerca del mínimo/u);
+});
+
+test("caso 3: tres páginas seguidas mantienen orden y tamaño y no repiten productos", async () => {
+  const gateway = new PaginatedGateway(
+    Array.from({ length: 12 }, (_, index) => syntheticProduct(index)),
+  );
+  const tools = new StoreReadTools(gateway);
+
+  const pages = [];
+  for (const pagina of [1, 2, 3]) {
+    pages.push(await tools.listar_productos({ pagina, tamanoPagina: 5 }));
+  }
+
+  const items = pages.map((page) => (page.data as ProductPage).items);
+  assert.deepEqual(
+    items.map((page) => page.length),
+    [5, 5, 2],
+  );
+  assert.deepEqual(
+    pages.map((page) => page.meta.tamanoPagina),
+    [5, 5, 5],
+  );
+  assert.deepEqual(
+    pages.map((page) => page.meta.siguientePagina),
+    [2, 3, null],
+  );
+  assert.deepEqual(
+    pages.map((page) => [page.meta.primeraPosicion, page.meta.ultimaPosicion]),
+    [
+      [1, 5],
+      [6, 10],
+      [11, 12],
+    ],
+  );
+
+  const seen = items.flat().map((item) => item.id);
+  assert.equal(new Set(seen).size, 12);
+  assert.deepEqual(
+    seen,
+    gateway.products.map((item) => item.id),
+  );
+  /* Todos los elementos de las tres páginas traen los mismos campos. */
+  const shapes = new Set(
+    items.flat().map((item) => Object.keys(item).sort().join(",")),
+  );
+  assert.equal(shapes.size, 1);
+});
+
+test("caso 3b: «muéstrame más» continúa la consulta anterior sin repetir productos", async () => {
+  const gateway = new PaginatedGateway(
+    Array.from({ length: 12 }, (_, index) => syntheticProduct(index)),
+  );
+  const catalog = new StoreReadToolCatalog(new StoreReadTools(gateway));
+  const model = new ScriptedModel([
+    assistant("", [toolCall("listar_productos", { tamanoPagina: 5, pagina: 1 })]),
+    assistant("Estos son los primeros cinco de doce."),
+    assistant("", [toolCall("listar_productos", { tamanoPagina: 5, pagina: 2 })]),
+    assistant("Continúo con los cinco siguientes."),
+  ]);
+  const agent = new StoreChatAgent(model, catalog);
+
+  const first = await agent.respond("Muéstrame 5 productos");
+  const firstIds = first.state.candidates.map((candidate) => candidate.id);
+  assert.equal(first.state.lastList?.siguientePagina, 2);
+  assert.equal(first.state.lastList?.tamanoPagina, 5);
+
+  const second = await agent.respond("Muéstrame más");
+  const secondIds = second.state.candidates.map((candidate) => candidate.id);
+
+  assert.deepEqual(
+    gateway.listQueries.map((query) => [query.pagina, query.tamanoPagina, query.orden]),
+    [
+      [1, 5, "nombre_asc"],
+      [2, 5, "nombre_asc"],
+    ],
+  );
+  assert.equal(firstIds.length, 5);
+  assert.equal(secondIds.length, 5);
+  assert.equal(
+    secondIds.some((id) => firstIds.includes(id)),
+    false,
+  );
+  assert.equal(second.state.lastList?.siguientePagina, 3);
+  /* El contexto del segundo turno llevaba la continuación del listado. */
+  const context = (model.seen[2] ?? []).filter(
+    (message) => message.role === "system",
+  )[1];
+  assert.match(String(context?.content), /"siguientePagina":2/u);
+});
+
+test("caso 4: una coincidencia dentro de una palabra más larga no es exacta", async () => {
+  assert.equal(classifyProductMatch("vera", "Verapan Integral", "SX-90"), "parcial");
+  assert.equal(classifyProductMatch("vera", "Vera Clásica 500 g", "SX-91"), "exacta");
+  assert.equal(classifyProductMatch("vera clasica", "Vera Clásica 500 g", null), "exacta");
+  assert.equal(classifyProductMatch("SX-91", "Vera Clásica 500 g", "SX-91"), "exacta");
+
+  const parcial = syntheticProduct(0, { nombre: "Verapan Integral" });
+  const exacta = syntheticProduct(1, { nombre: "Vera Clásica 500 g" });
+
+  class SearchGateway extends PaginatedGateway {
+    constructor(private readonly matches: readonly ProductListItem[]) {
+      super([]);
+    }
+
+    override async searchProducts(): Promise<ProductListItem[]> {
+      return [...this.matches];
+    }
+  }
+
+  const soloParcial = await new StoreReadTools(
+    new SearchGateway([parcial]),
+  ).buscar_productos({ consulta: "vera" });
+  assert.equal(soloParcial.status, "ok");
+  assert.equal(soloParcial.meta.hayCoincidenciaExacta, false);
+  assert.equal(soloParcial.meta.coincidenciasParciales, 1);
+  assert.equal((soloParcial.data as ProductSearchMatch[])[0]?.coincidencia, "parcial");
+  assert.match(soloParcial.message, /Ninguna coincidencia es exacta/u);
+
+  const conExacta = await new StoreReadTools(
+    new SearchGateway([exacta, parcial]),
+  ).buscar_productos({ consulta: "vera" });
+  assert.equal(conExacta.meta.hayCoincidenciaExacta, true);
+  assert.deepEqual(
+    (conExacta.data as ProductSearchMatch[]).map((match) => match.coincidencia),
+    ["exacta", "parcial"],
+  );
+  assert.match(SIBIA_SYSTEM_PROMPT, /nunca afirmas que sí lo tenéis/u);
+});
+
+test("caso 5: una corrección del usuario llega al modelo y no dispara otra tool", async () => {
+  const { agent, catalog, model } = agentWith(
+    [
+      assistant("", [toolCall("resumen_inventario", {})]),
+      assistant("No tengo datos de ventas, así que no puedo decirte los más vendidos."),
+      assistant(
+        "Correcto, preguntaste por los productos más vendidos, no por los más baratos. Ahora mismo no tengo datos de ventas para responderlo.",
+      ),
+    ],
+    { resumen_inventario: () => ok("resumen_inventario", { totalProductos: 12 }) },
+  );
+
+  await agent.respond("¿Cuáles son los productos más vendidos?");
+  const turn = await agent.respond("No, yo no pregunté por el producto más barato");
+
+  assert.equal(catalog.executed.length, 1);
+  assert.equal(turn.toolResults.length, 0);
+  assert.equal(
+    (model.seen.at(-1) ?? []).at(-1)?.content,
+    "No, yo no pregunté por el producto más barato",
+  );
+  assert.match(
+    SIBIA_SYSTEM_PROMPT,
+    /Si el usuario te corrige, empiezas reconociéndolo en una frase/u,
+  );
+});
+
+test("caso 6: la bienvenida se adapta al negocio configurado y al valor neutro", () => {
+  const configurada = welcomeBanner("Tienda La Esquina");
+  assert.match(configurada, /^SIBIA\n/u);
+  assert.match(configurada, /Asistente inteligente de inventario de Tienda La Esquina/u);
+  assert.match(configurada, /Sesión segura iniciada\./u);
+  assert.match(configurada, /\/salir/u);
+  assert.doesNotMatch(configurada, /Sesión iniciada\. Escribe/u);
+
+  const neutra = welcomeBanner();
+  assert.match(neutra, /Asistente inteligente de inventario de esta tienda/u);
+  assert.equal(welcomeBanner("   "), neutra);
+
+  /* El mismo nombre identifica a SIBIA dentro del prompt del sistema. */
+  assert.match(
+    buildSibiaSystemPrompt("Tienda La Esquina"),
+    /asistente de inventario de Tienda La Esquina/u,
+  );
+  assert.match(SIBIA_SYSTEM_PROMPT, /asistente de inventario de esta tienda/u);
+});
+
+test("caso 6b: la consola imprime la bienvenida una vez y no la pasa al modelo", async (t) => {
+  const printed: string[] = [];
+  t.mock.method(console, "log", (...args: unknown[]) => {
+    printed.push(args.map(String).join(" "));
+  });
+  const inputs = ["Hola", "/salir"];
+  const { agent, model } = agentWith([assistant("¡Hola! ¿En qué te ayudo?")]);
+
+  await runInteractiveChat(agent, {
+    businessName: "Tienda La Esquina",
+    ask: async () => inputs.shift() ?? "/salir",
+  });
+
+  assert.equal(printed[0], welcomeBanner("Tienda La Esquina"));
+  assert.equal(
+    printed.filter((line) => line.includes("Asistente inteligente")).length,
+    1,
+  );
+  assert.deepEqual(
+    model.seen.map((messages) => messages.at(-1)?.content),
+    ["Hola"],
+  );
+});
+
+test("caso 7: una tabla compacta de ranking llega al usuario tal como la escribió el modelo", async () => {
+  const table = [
+    "Ranking por stock registrado:",
+    "",
+    "| # | Producto | Stock | Mínimo | Precio |",
+    "| --- | --- | --- | --- | --- |",
+    "| 1 | Artículo Sintético 03 | 12 | 2 | 1.520 |",
+    "| 2 | Artículo Sintético 02 | 11 | 2 | 1.510 |",
+    "| 3 | Artículo Sintético 01 | 10 | 2 | 1.500 |",
+  ].join("\n");
+  const { agent } = agentWith(
+    [
+      assistant("", [toolCall("listar_productos", { orden: "stock_desc", tamanoPagina: 3 })]),
+      assistant(table),
+    ],
+    {
+      listar_productos: () =>
+        ok("listar_productos", {
+          items: [syntheticProduct(2), syntheticProduct(1), syntheticProduct(0)],
+          pagina: 1,
+          tamanoPagina: 3,
+          total: 12,
+          totalPaginas: 4,
+        }),
+    },
+  );
+
+  const turn = await agent.respond("Dame el ranking de los tres con más stock");
+
+  assert.equal(turn.text, table);
+  assert.equal(inspectAssistantText(turn.text), null);
+  const columns = table
+    .split("\n")
+    .find((line) => line.startsWith("| #"))!
+    .split("|")
+    .filter((cell) => cell.trim() !== "").length;
+  assert.ok(columns <= 5);
+  assert.match(SIBIA_SYSTEM_PROMPT, /cinco columnas como máximo/u);
+  assert.match(SIBIA_SYSTEM_PROMPT, /Para un solo producto usas una lista breve/u);
+});
+
+test("caso 8: una línea vacía vuelve a preguntar y no cierra el chat", async (t) => {
+  const prompts: string[] = [];
+  t.mock.method(console, "log", () => undefined);
+  const inputs = ["", "   ", "Hola", "", "/salir", "no llega"];
+  const { agent, model } = agentWith([assistant("¡Hola! ¿En qué te ayudo?")]);
+
+  await runInteractiveChat(agent, {
+    ask: async (prompt) => {
+      prompts.push(prompt);
+      return (inputs.shift() ?? "/salir").trim();
+    },
+  });
+
+  /* Cinco entradas leídas: las vacías solo repitieron la pregunta. */
+  assert.equal(prompts.length, 5);
+  assert.deepEqual(new Set(prompts), new Set(["Tú: "]));
+  assert.deepEqual(
+    model.seen.map((messages) => messages.at(-1)?.content),
+    ["Hola"],
+  );
+  assert.deepEqual(inputs, ["no llega"]);
+});
+
+test("caso 9: el contexto identifica el producto pero no lleva su stock ni su precio", async () => {
+  const shown = [syntheticProduct(0), syntheticProduct(1)];
+  const { agent, model } = agentWith(
+    [
+      assistant("", [toolCall("buscar_productos", { consulta: "articulo" })]),
+      assistant("Encontré dos artículos."),
+      assistant("", [toolCall("consultar_stock", { productoId: shown[1]!.id })]),
+      assistant("El segundo tiene 11 unidades registradas."),
+    ],
+    {
+      buscar_productos: () => ok("buscar_productos", shown),
+      consultar_stock: () =>
+        ok("consultar_stock", {
+          id: shown[1]!.id,
+          nombre: shown[1]!.nombre,
+          stockRegistrado: shown[1]!.stockRegistrado,
+          stockMinimo: shown[1]!.stockMinimo,
+          estado: shown[1]!.estado,
+          stockBajo: shown[1]!.stockBajo,
+          cantidadVendibleConfirmada: false,
+        }),
+    },
+  );
+
+  await agent.respond("Busca artículos");
+  const turn = await agent.respond("¿Cuánto stock tiene el segundo?");
+
+  const context = String(
+    (model.seen.at(-1) ?? []).filter((message) => message.role === "system")[1]
+      ?.content,
+  );
+  /* Identifica: posición, id y nombre del producto seleccionado. */
+  assert.match(context, /"selectedProduct"/u);
+  assert.match(context, new RegExp(`"posicion":2,"id":"${shown[1]!.id}"`, "u"));
+  assert.match(context, new RegExp(shown[1]!.nombre, "u"));
+  /* No entrega datos mutables que evitarían volver a consultar. */
+  assert.doesNotMatch(context, /stockRegistrado|stockMinimo|precioVenta|stockBajo/u);
+  /* El estado interno sí los conserva para el backend. */
+  assert.equal(turn.state.selectedProduct?.stockRegistrado, 11);
+  assert.equal(
+    turn.toolResults.filter((execution) => execution.name === "consultar_stock").length,
+    1,
+  );
+});
+
+test("caso 10: las reglas de herencia de argumentos y de tools sin datos están declaradas", () => {
+  /* Una consulta nueva no arrastra el tamaño de la anterior. */
+  assert.match(SIBIA_SYSTEM_PROMPT, /Una consulta nueva no hereda nada de la anterior/u);
+  assert.match(SIBIA_SYSTEM_PROMPT, /omites tamanoPagina y dejas que la tool use su valor por defecto/u);
+  assert.match(SIBIA_SYSTEM_PROMPT, /La única excepción es continuar un listado/u);
+
+  const listar = STORE_READ_TOOL_DEFINITIONS.find(
+    (definition) => definition.function.name === "listar_productos",
+  );
+  assert.match(listar!.function.description, /omite tamanoPagina cuando el usuario no indicó una cantidad/u);
+  assert.equal(
+    (listar!.function.parameters.properties as Record<string, { default?: number }>)
+      .tamanoPagina?.default,
+    10,
+  );
+
+  /* Una tool que no puede aportar datos no debe ejecutarse. */
+  assert.match(SIBIA_SYSTEM_PROMPT, /Si el tema entero queda fuera de tus tools, como las ventas/u);
+  const resumen = STORE_READ_TOOL_DEFINITIONS.find(
+    (definition) => definition.function.name === "resumen_inventario",
+  );
+  assert.match(resumen!.function.description, /No contiene ventas, unidades vendidas, popularidad ni rotación/u);
+
+  /* Una comparación de dos grupos va en una sola tabla. */
+  assert.match(SIBIA_SYSTEM_PROMPT, /una sola tabla cuya primera columna "Grupo" dice a qué grupo pertenece cada fila/u);
+
+  /* El dato mutable se vuelve a consultar aunque el producto ya se conozca. */
+  assert.match(SIBIA_SYSTEM_PROMPT, /llamas otra vez a la tool aunque ya conozcas el producto/u);
+});
+
+/*
+ * Invariante de paginación: una continuación conserva el tamaño, el
+ * orden y los filtros del listado anterior, y dentro de un mismo turno
+ * la misma página no puede volver a pedirse con otro tamaño.
+ */
+function paginationAgent(replies: readonly OllamaAssistantMessage[]): {
+  agent: StoreChatAgent;
+  gateway: PaginatedGateway;
+} {
+  const gateway = new PaginatedGateway(
+    Array.from({ length: 12 }, (_, index) => syntheticProduct(index)),
+  );
+  const agent = new StoreChatAgent(
+    new ScriptedModel(replies),
+    new StoreReadToolCatalog(new StoreReadTools(gateway)),
+  );
+  return { agent, gateway };
+}
+
+const pageItems = (execution: { result: StoreToolCallResult } | undefined): string[] =>
+  ((execution?.result.data as ProductPage | null)?.items ?? []).map((item) => item.id);
+
+test("caso 11: una segunda llamada a la misma página con otro tamaño se rechaza", async () => {
+  const { agent, gateway } = paginationAgent([
+    assistant("", [toolCall("listar_productos", {})]),
+    assistant("Estos son los primeros 10 de 12."),
+    /* El fallo real: dos llamadas a la página 2 con tamaños distintos. */
+    assistant("", [
+      toolCall("listar_productos", { pagina: 2, tamanoPagina: 10 }),
+      toolCall("listar_productos", { pagina: 2, tamanoPagina: 6 }),
+    ]),
+    assistant("Y estos son los 2 restantes."),
+  ]);
+
+  const first = await agent.respond("Muéstrame los productos");
+  const second = await agent.respond("Muéstrame más");
+
+  /* 1. La página 1 usó el tamaño predeterminado de la tool. */
+  assert.equal(first.toolResults[0]?.result.status, "ok");
+  assert.deepEqual(
+    gateway.listQueries.map((query) => [query.pagina, query.tamanoPagina, query.orden]),
+    [
+      [1, 10, "nombre_asc"],
+      [2, 10, "nombre_asc"],
+    ],
+  );
+
+  /* 2 y 3. La página correcta se entregó; la incompatible se rechazó. */
+  assert.equal(second.toolResults.length, 2);
+  assert.equal(second.toolResults[0]?.result.status, "ok");
+  assert.equal(second.toolResults[0]?.result.meta.tamanoPagina, 10);
+  assert.equal(second.toolResults[1]?.result.status, "invalid_input");
+  assert.equal(second.toolResults[1]?.result.error?.code, "INCONSISTENT_PAGE_SIZE");
+  assert.equal(second.toolResults[1]?.result.data, null);
+  /* El rechazo no sustituyó el resultado correcto ni tocó el gateway. */
+  assert.equal(gateway.listQueries.length, 2);
+  assert.equal(second.status, "ok");
+  assert.equal(second.text, "Y estos son los 2 restantes.");
+
+  /* 4. Ningún producto repetido entre las dos páginas. */
+  const firstPage = pageItems(first.toolResults[0]);
+  const secondPage = pageItems(second.toolResults[0]);
+  assert.deepEqual([firstPage.length, secondPage.length], [10, 2]);
+  assert.equal(new Set([...firstPage, ...secondPage]).size, 12);
+});
+
+test("caso 12: una continuación con otro tamaño se completa con los argumentos canónicos", async () => {
+  const { agent, gateway } = paginationAgent([
+    assistant("", [toolCall("listar_productos", {})]),
+    assistant("Estos son los primeros 10 de 12."),
+    /* Única llamada, con el tamaño equivocado y filtros incompletos. */
+    assistant("", [toolCall("listar_productos", { pagina: 2, tamanoPagina: 6 })]),
+    assistant("Y estos son los 2 restantes."),
+  ]);
+
+  const first = await agent.respond("Muéstrame los productos");
+  const second = await agent.respond("Muéstrame más");
+
+  assert.deepEqual(
+    gateway.listQueries.map((query) => [query.pagina, query.tamanoPagina, query.orden]),
+    [
+      [1, 10, "nombre_asc"],
+      [2, 10, "nombre_asc"],
+    ],
+  );
+  assert.equal(second.toolResults[0]?.result.status, "ok");
+  assert.equal(second.toolResults[0]?.result.meta.tamanoPagina, 10);
+  assert.equal(second.toolResults[0]?.arguments &&
+    (second.toolResults[0].arguments as { tamanoPagina: number }).tamanoPagina, 10);
+
+  const firstPage = pageItems(first.toolResults[0]);
+  const secondPage = pageItems(second.toolResults[0]);
+  assert.equal(
+    secondPage.some((id) => firstPage.includes(id)),
+    false,
+  );
+  assert.equal(new Set([...firstPage, ...secondPage]).size, 12);
+});
+
+test("caso 13: el ranking con dos órdenes distintos sigue ejecutando ambas llamadas", async () => {
+  const { agent, gateway } = paginationAgent([
+    assistant("", [
+      toolCall("listar_productos", { orden: "stock_desc", tamanoPagina: 2 }),
+      toolCall("listar_productos", { orden: "stock_asc", tamanoPagina: 2 }),
+    ]),
+    assistant("Estos son los de mayor y menor stock."),
+  ]);
+
+  const turn = await agent.respond("Los 2 con más y los 2 con menos stock");
+
+  assert.deepEqual(
+    gateway.listQueries.map((query) => [query.orden, query.tamanoPagina, query.pagina]),
+    [
+      ["stock_desc", 2, 1],
+      ["stock_asc", 2, 1],
+    ],
+  );
+  assert.deepEqual(
+    turn.toolResults.map((execution) => execution.result.status),
+    ["ok", "ok"],
   );
 });
