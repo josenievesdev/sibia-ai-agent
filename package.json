@@ -16,8 +16,15 @@
     "chat:debug": "node --env-file-if-exists=.env --import tsx src/scripts/chat.ts --debug",
     "telegram": "node --env-file-if-exists=.env --import tsx src/scripts/telegram.ts",
     "telegram:debug": "node --env-file-if-exists=.env --import tsx src/scripts/telegram.ts --debug",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test test/config.test.ts test/http.test.ts test/supabase-check.test.ts test/ollama-client.test.ts test/sibia-agent.test.ts test/telegram.test.ts",
+    "web:dev": "vite --config web/vite.config.ts",
+    "web:build": "vite build --config web/vite.config.ts",
+    "web:preview": "vite preview --config web/vite.config.ts",
+    "web:demo": "node --import tsx src/scripts/web-demo.ts",
+    "build:all": "npm run build && npm run web:build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json",
+    "test": "npm run test:server && npm run test:web",
+    "test:server": "node --import tsx --test test/config.test.ts test/http.test.ts test/supabase-check.test.ts test/ollama-client.test.ts test/sibia-agent.test.ts test/telegram.test.ts test/web-channel.test.ts",
+    "test:web": "vitest run --config web/vite.config.ts",
     "start": "node --env-file-if-exists=.env dist/http/server.js",
     "check:health": "node --env-file-if-exists=.env --import tsx src/scripts/check-health.ts",
     "check:admin": "node --env-file-if-exists=.env --import tsx src/scripts/check-admin.ts",
@@ -26,12 +33,26 @@
     "tools:console": "node --env-file-if-exists=.env --import tsx src/scripts/tools-console.ts"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
     "@supabase/supabase-js": "^2.115.0",
-    "fastify": "^5.12.3"
+    "fastify": "^5.12.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.13.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "jsdom": "^30.0.1",
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.0"
   }
 }

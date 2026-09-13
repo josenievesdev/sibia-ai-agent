@@ -1,0 +1,240 @@
+/* Modal de acceso seguro sobre la pantalla inicial velada. */
+
+.access-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  overflow-y: auto;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background: var(--veil);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.access-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+  max-width: 420px;
+  margin: auto;
+  padding: 30px 26px 26px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-modal);
+  animation: access-enter 220ms ease-out both;
+}
+
+@keyframes access-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.brand--modal {
+  gap: 10px;
+}
+
+.brand--modal .brand__symbol {
+  width: 30px;
+  height: 30px;
+}
+
+.brand--modal .brand__word {
+  font-size: 18px;
+  letter-spacing: 2.8px;
+}
+
+.access-modal__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 34px;
+  letter-spacing: -0.5px;
+  color: var(--color-graphite);
+}
+
+.access-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.access-form__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field__label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.1px;
+  color: var(--color-text-secondary);
+}
+
+.field__control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.field__control:focus-within {
+  border-color: rgb(180 85 47 / 0.55);
+  box-shadow: var(--focus-ring);
+}
+
+.field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-graphite);
+  font-size: 16px;
+  line-height: 20px;
+}
+
+.field__input::placeholder {
+  color: var(--color-placeholder);
+  opacity: 1;
+}
+
+.field__input:focus-visible {
+  outline: none;
+}
+
+.field__input--password[type="password"] {
+  letter-spacing: 2px;
+}
+
+.field__input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 40px var(--color-surface-muted) inset;
+  -webkit-text-fill-color: var(--color-graphite);
+}
+
+.field__toggle {
+  flex: none;
+  margin-right: -6px;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-terracotta);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.field__toggle:hover {
+  color: var(--color-terracotta-hover);
+}
+
+.button-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 16px 20px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--color-terracotta);
+  color: var(--color-surface);
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--color-terracotta-hover);
+}
+
+.button-primary:disabled {
+  opacity: 0.78;
+  cursor: progress;
+}
+
+.access-message {
+  display: flex;
+  justify-content: center;
+  min-height: 17px;
+}
+
+.access-message__help,
+.access-message__error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.access-message__help {
+  color: var(--color-text-muted);
+}
+
+.access-message__help .access-message__icon {
+  color: var(--color-placeholder);
+}
+
+.access-message__error {
+  color: var(--color-terracotta);
+  font-weight: 500;
+}
+
+.access-message__icon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 2.4px;
+}
+
+@media (min-width: 480px) {
+  .access-modal {
+    gap: 26px;
+    padding: 38px 38px 32px;
+  }
+
+  .access-form {
+    gap: 26px;
+  }
+}
+
+@media (min-width: 768px) {
+  .field__input {
+    font-size: 14.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .access-modal {
+    animation: none;
+  }
+}

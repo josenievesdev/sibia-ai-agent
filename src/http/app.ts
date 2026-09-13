@@ -3,12 +3,18 @@ import Fastify, {
   type FastifyServerOptions,
 } from "fastify";
 
+import {
+  createWebChannel,
+  type WebChannel,
+} from "../channels/web/web-channel.js";
 import type { AppConfig } from "../config/env.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerIntegrationCheckRoutes } from "./routes/integration-checks.js";
+import { registerWebChatRoutes } from "./routes/web-chat.js";
 
 interface BuildAppOptions {
   logger?: FastifyServerOptions["logger"];
+  webChannel?: WebChannel | null;
 }
 
 export function buildApp(
@@ -21,6 +27,18 @@ export function buildApp(
 
   registerHealthRoute(app, config);
   registerIntegrationCheckRoutes(app, config);
+
+  const webChannel =
+    options.webChannel === undefined
+      ? createWebChannel(config)
+      : options.webChannel;
+  registerWebChatRoutes(app, webChannel);
+  if (webChannel !== null) {
+    webChannel.sessions.start();
+    app.addHook("onClose", async () => {
+      webChannel.sessions.stop();
+    });
+  }
 
   app.setErrorHandler((error, request, reply) => {
     const reportedStatusCode =

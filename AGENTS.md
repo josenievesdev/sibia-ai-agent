@@ -4,7 +4,7 @@
 
 - El proyecto se llama SIBIA. No añadir sufijos de versión ni mezclar otros dominios comerciales.
 - El dominio actual es una tienda real. No construir una plataforma multiempresa sin un requisito nuevo.
-- El frontend futuro será React, pero no existe en esta etapa.
+- El frontend es React en `web/` y solo es otro canal del agente existente: no llama a Ollama ni consulta datos de negocio directamente.
 - No agregar ubicaciones; no son un requisito actual.
 
 ## Plataforma

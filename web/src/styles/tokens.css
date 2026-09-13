@@ -1,0 +1,33 @@
+:root {
+  /* Identidad visual aprobada de SIBIA. */
+  --color-ivory: #fbf8f4;
+  --color-graphite: #241f1c;
+  --color-terracotta: #b4552f;
+  --color-terracotta-hover: #9f4927;
+  --color-surface: #ffffff;
+  --color-border: #e9dfd4;
+  --color-surface-muted: #f6f1ea;
+  --color-text-muted: #8c837b;
+  --color-text-secondary: #56504a;
+  --color-divider: #f2eae1;
+  --color-placeholder: #b6aba1;
+
+  --veil: rgb(251 248 244 / 0.74);
+  --focus-ring: 0 0 0 3px rgb(180 85 47 / 0.24);
+  --shadow-composer: 0 4px 18px -6px rgb(36 31 28 / 0.1);
+  --shadow-composer-compact: 0 3px 14px -5px rgb(36 31 28 / 0.12);
+  --shadow-modal: 0 24px 60px -14px rgb(36 31 28 / 0.2);
+
+  --font-sans: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --font-display: "Fraunces Variable", Fraunces, Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+
+  --radius-bubble: 14px;
+  --radius-input: 12px;
+  --radius-button: 13px;
+  --radius-composer: 17px;
+  --radius-modal: 22px;
+
+  --content-width: 720px;
+}

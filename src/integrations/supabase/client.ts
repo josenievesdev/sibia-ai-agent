@@ -6,6 +6,12 @@ import {
 import type { SupabaseConfig } from "../../config/env.js";
 
 export interface SupabaseConnectionOptions {
+  /*
+   * JWT de un usuario ya autenticado fuera de este cliente. Cada consulta
+   * lo envía como Authorization para que RLS se aplique a esa identidad;
+   * con esta opción `client.auth` deja de estar disponible.
+   */
+  accessToken?: () => Promise<string | null>;
   autoRefreshToken?: boolean;
   requestTimeoutMs?: number;
 }
@@ -32,6 +38,9 @@ export function createSupabaseConnection(
       detectSessionInUrl: false,
       persistSession: false,
     },
+    ...(options.accessToken === undefined
+      ? {}
+      : { accessToken: options.accessToken }),
     ...(options.requestTimeoutMs === undefined
       ? {}
       : { global: { fetch: fetchWithTimeout(options.requestTimeoutMs) } }),

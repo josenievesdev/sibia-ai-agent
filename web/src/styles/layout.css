@@ -1,0 +1,333 @@
+/* Estructura: encabezado mínimo, conversación y compositor en 100dvh. */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--color-ivory);
+}
+
+.app-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: max(18px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 18px
+    max(20px, env(safe-area-inset-left));
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.brand__symbol {
+  flex: none;
+  width: 23px;
+  height: 23px;
+}
+
+.brand__word {
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 2.4px;
+  color: var(--color-graphite);
+}
+
+.app-header__signout {
+  flex: none;
+  margin: -4px -6px;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.app-header__signout:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted);
+}
+
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-top: 16px;
+  /* Reserva el carril de la barra para que el contenido no salte al aparecer. */
+  scrollbar-gutter: stable both-edges;
+}
+
+.thread__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  width: 100%;
+  max-width: calc(var(--content-width) + 40px);
+  margin: 0 auto;
+  padding: 12px 20px 28px;
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  min-height: 100%;
+  padding: 0 26px 40px;
+  text-align: center;
+}
+
+.welcome__symbol {
+  flex: none;
+  width: 46px;
+  height: 46px;
+}
+
+.welcome__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 780px;
+}
+
+.welcome__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 33px;
+  letter-spacing: -0.5px;
+  color: var(--color-graphite);
+  text-wrap: balance;
+}
+
+.welcome__text {
+  max-width: 520px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--color-text-muted);
+  text-wrap: pretty;
+}
+
+.composer-zone {
+  flex: none;
+  padding: 8px max(16px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  width: 100%;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 6px 6px 6px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-composer-compact);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.composer:focus-within {
+  border-color: rgb(180 85 47 / 0.45);
+  box-shadow: var(--shadow-composer-compact), var(--focus-ring);
+}
+
+.composer__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 38px;
+  max-height: 180px;
+  margin: 0;
+  padding: 8px 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  background: transparent;
+  color: var(--color-graphite);
+  /* 16px evita el zoom automático de iOS al enfocar el campo. */
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.composer__input::placeholder {
+  color: var(--color-placeholder);
+  opacity: 1;
+}
+
+.composer__input:focus-visible {
+  outline: none;
+}
+
+.composer__send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-terracotta);
+  color: var(--color-surface);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    opacity 150ms ease;
+}
+
+.composer__send-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.composer__send:hover:not(:disabled) {
+  background: var(--color-terracotta-hover);
+}
+
+.composer__send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (min-width: 768px) {
+  .app-header {
+    padding: max(26px, env(safe-area-inset-top)) 34px 26px;
+  }
+
+  .brand {
+    gap: 9px;
+  }
+
+  .brand__symbol {
+    width: 26px;
+    height: 26px;
+  }
+
+  .brand__word {
+    font-size: 17px;
+    letter-spacing: 2.6px;
+  }
+
+  .app-header__signout {
+    font-size: 13px;
+  }
+
+  .thread__inner {
+    gap: 30px;
+    padding: 16px 20px 36px;
+  }
+
+  .welcome {
+    gap: 28px;
+    padding: 0 40px 40px;
+  }
+
+  .welcome__symbol {
+    width: 58px;
+    height: 58px;
+  }
+
+  .welcome__copy {
+    gap: 14px;
+  }
+
+  .welcome__title {
+    font-size: 34px;
+    line-height: 43px;
+    letter-spacing: -0.8px;
+  }
+
+  .welcome__text {
+    font-size: 15.5px;
+    line-height: 25px;
+  }
+
+  .composer-zone {
+    padding: 8px 34px max(28px, env(safe-area-inset-bottom));
+  }
+
+  .composer {
+    gap: 12px;
+    padding: 7px 7px 7px 20px;
+    border-radius: var(--radius-composer);
+    box-shadow: var(--shadow-composer);
+  }
+
+  .composer:focus-within {
+    box-shadow: var(--shadow-composer), var(--focus-ring);
+  }
+
+  .composer__input {
+    min-height: 42px;
+    padding: 10px 0;
+    font-size: 15.5px;
+  }
+
+  .composer__send {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-button);
+  }
+
+  .composer__send-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Estado inicial en pantallas amplias: bienvenida y compositor centrados. */
+  .stage--empty {
+    gap: 28px;
+    padding: 0 40px 90px;
+    overflow-y: auto;
+  }
+
+  .stage--empty > .thread {
+    flex: none;
+    min-height: auto;
+    margin-top: auto;
+    overflow: visible;
+  }
+
+  .stage--empty > .composer-zone {
+    margin-bottom: auto;
+    padding: 0;
+  }
+
+  .stage--empty .welcome {
+    min-height: auto;
+    padding: 0;
+  }
+}

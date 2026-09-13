@@ -1,0 +1,181 @@
+/* Respuestas de SIBIA: estilo editorial, sin burbujas. */
+
+.md {
+  min-width: 0;
+  color: var(--color-graphite);
+  font-size: 15.5px;
+  line-height: 26px;
+  overflow-wrap: break-word;
+}
+
+.md :where(p, ul, ol, h1, h2, h3, h4, h5, h6, pre, blockquote, hr) {
+  margin: 0;
+}
+
+.md > * + * {
+  margin-top: 14px;
+}
+
+.md > :where(h1, h2, h3, h4, h5, h6) + * {
+  margin-top: 8px;
+}
+
+.md :where(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.3px;
+}
+
+.md h1 {
+  font-size: 22px;
+}
+
+.md h2 {
+  font-size: 20px;
+}
+
+.md h3 {
+  font-size: 18px;
+}
+
+.md :where(h4, h5, h6) {
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.md strong {
+  font-weight: 600;
+}
+
+.md :where(ul, ol) {
+  padding-left: 1.35em;
+}
+
+.md li + li,
+.md li > :where(ul, ol) {
+  margin-top: 6px;
+}
+
+.md li::marker {
+  color: var(--color-text-muted);
+}
+
+.md code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--color-surface-muted);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+.md pre {
+  padding: 14px 16px;
+  overflow-x: auto;
+  border-radius: var(--radius-input);
+  background: var(--color-surface-muted);
+  line-height: 1.5;
+}
+
+.md pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.md blockquote {
+  padding-left: 14px;
+  border-left: 2px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--color-divider);
+}
+
+.md a {
+  color: var(--color-terracotta);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* Tablas: ancho completo y desplazamiento horizontal propio si no caben. */
+.md-table {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: 4px;
+}
+
+.md > .md-table,
+.md > .md-table + * {
+  margin-top: 18px;
+}
+
+.md > .md-table:first-child {
+  margin-top: 4px;
+}
+
+.md-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.md-table th {
+  padding: 0 10px 11px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.9px;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.md-table td {
+  padding: 16px 10px;
+  border-bottom: 1px solid var(--color-divider);
+  vertical-align: middle;
+}
+
+.md-table :where(th, td):first-child {
+  padding-left: 4px;
+}
+
+.md-table :where(th, td):last-child {
+  padding-right: 4px;
+}
+
+/*
+ * En pantallas estrechas las columnas de texto conservan un ancho legible y
+ * la tabla se desplaza en horizontal en lugar de partir cada palabra.
+ */
+.md-table td:not(.md-numeric) {
+  min-width: 10rem;
+}
+
+.md-table .md-numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.md-table td.md-numeric {
+  font-weight: 500;
+}
+
+@media (min-width: 768px) {
+  .md {
+    font-size: 16.5px;
+    line-height: 28px;
+  }
+
+  .md > :where(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) {
+    max-width: 600px;
+  }
+}

@@ -1,6 +1,6 @@
 # SIBIA
 
-Base inicial del backend de SIBIA, un asistente empresarial con IA para una tienda real. Esta etapa incorpora la API HTTP, comprobaciones de infraestructura, cinco tools de lectura y el mismo agente conversacional desde consola o Telegram; todavía no incluye frontend ni un endpoint de chat.
+SIBIA es un asistente empresarial con IA para una tienda real. Esta etapa incorpora la API HTTP, comprobaciones de infraestructura, cinco tools de lectura y el mismo agente conversacional desde consola, Telegram o la interfaz web en React.
 
 ## Requisitos comprobados
 
@@ -61,9 +61,9 @@ npm run dev
 npm run chat
 npm run telegram
 npm run telegram:debug
-npm run typecheck
+npm run typecheck   # backend y web
 npm run build
-npm test
+npm test            # test:server (node:test) y test:web (Vitest)
 npm start
 npm run check:health
 npm run check:ollama
@@ -95,6 +95,32 @@ Para crear y autorizar el bot:
 
 Con una lista vacía, `/id` es la única operación permitida. Los archivos, imágenes, audio y stickers no se procesan en esta primera versión. La memoria se pierde al reiniciar el proceso y una sola instancia local debe atender el token del bot a la vez.
 
+## Interfaz web
+
+La interfaz de `web/` (React, Vite y CSS propio) es otro adaptador del mismo `StoreChatAgent`:
+
+```text
+navegador → Supabase Auth (publishable key) → Fastify /api/web con Bearer
+→ canal web → StoreChatAgent → Ministral → tools → Supabase bajo RLS → React
+```
+
+- React usa Supabase Auth solo para iniciar sesión. La URL y la publishable key las entrega `GET /api/web/config`; la sesión vive en memoria y recargar la página vuelve a pedir acceso.
+- Fastify valida el token con Supabase Auth en cada solicitud, comprueba el acceso administrativo con la lógica existente al iniciar la sesión web y ejecuta las tools con el JWT del usuario, de modo que RLS se aplica a esa identidad.
+- Cada usuario tiene una conversación en memoria, ligada a su inicio de sesión, con su propia instancia del agente y una cola secuencial. Cerrar sesión la destruye; las inactivas se eliminan a los 30 minutos. Nada se guarda en la base de datos.
+- Las respuestas se muestran tal como las redacta el agente: Markdown seguro (sin HTML del modelo) y tablas GFM con desplazamiento horizontal en pantallas estrechas.
+
+Comandos:
+
+```powershell
+npm run web:demo    # API y web juntas: abre http://127.0.0.1:5173
+npm run dev         # solo la API
+npm run web:dev     # solo la web (proxy /api hacia APP_HOST:PORT del .env)
+npm run build:all   # backend en dist/ y web en dist/web/
+npm run web:preview # sirve dist/web con el mismo proxy
+```
+
+La cuenta web debe existir en Supabase Auth con perfil activo y rol de negocio `admin`. No se usan las credenciales de Telegram. Para apuntar el proxy a otra API, define `SIBIA_WEB_API_TARGET` al ejecutar Vite.
+
 Para comprobar el nuevo proyecto sin escribir secretos en archivos:
 
 ```powershell
@@ -110,6 +136,10 @@ npm run check:supabase
 | `GET /health` | Disponibilidad del proceso HTTP, sin comprobar servicios externos. |
 | `GET /checks/ollama` | Conexión a Ollama y presencia exacta de `ministral-3:8b`. |
 | `GET /checks/supabase` | Configuración, conexión y lectura controlada de `public.roles`. |
+| `GET /api/web/config` | URL y publishable key de Supabase para el inicio de sesión web. |
+| `POST /api/web/session` | Valida el token, comprueba acceso administrativo y abre una conversación limpia. |
+| `POST /api/web/chat` | Envía `{ "message": "..." }` al agente de la conversación del usuario. |
+| `DELETE /api/web/session` | Cierra la conversación web y descarta su memoria. |
 
 Los checks distinguen `available`, `not_configured`, `configuration_error`, `schema_missing`, `authentication_failed`, `permission_denied`, `access_unverified` y `unavailable`. Las rutas de comprobación son operativas y deberán protegerse o deshabilitarse antes de exponer la API públicamente.
 
@@ -140,6 +170,9 @@ Las migraciones ejecutables están en `supabase/migrations`. El orden de SQL Edi
 - `src/tools`: contratos de entrada cerrados y resultados estructurados para lectura.
 - `src/console`: entrada interactiva, conversación libre y ciclo de vida de sesiones de usuario.
 - `src/channels/telegram`: long polling, autorización por ID, adaptación de mensajes y sesiones aisladas que reutilizan el agente existente.
+- `src/channels/web`: validación de tokens web, fábrica de agentes con la identidad del usuario y administración de conversaciones web.
+- `src/http/routes/web-chat.ts`: rutas autenticadas del canal web.
+- `web/`: aplicación React (componentes, estilos, cliente HTTP y autenticación) y sus pruebas.
 - `src/scripts`: verificaciones y consola de tools sin levantar un servidor real.
 - `database/reference`: material original no ejecutable.
 - `docs`: arquitectura prevista y análisis del esquema.

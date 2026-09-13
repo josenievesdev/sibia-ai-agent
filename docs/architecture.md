@@ -13,8 +13,9 @@ La etapa actual establece nueve límites ejecutables:
 7. `tools`: valida entradas cerradas y traduce datos, vacíos y errores a resultados estructurados.
 8. `console`: gestiona entrada oculta, autenticación, conversación libre y cierre de sesiones interactivas.
 9. `channels/telegram`: adapta chats privados mediante long polling, autoriza IDs y conserva una instancia de agente y una cola por usuario.
+10. `channels/web` y `web/`: la API autenticada `/api/web` y la interfaz React, que es solo otro canal del mismo agente.
 
-El primer chat funciona mediante `npm run chat`; usa exactamente `ministral-3:8b`, las cinco tools de lectura y la sesión Supabase del usuario bajo RLS. No hay todavía endpoint de chat ni frontend. `/health` tampoco ejecuta checks remotos, por lo que una caída de Ollama o la ausencia de Supabase no impiden arrancar el backend.
+El chat funciona mediante `npm run chat`, Telegram o la interfaz web; usa exactamente `ministral-3:8b`, las cinco tools de lectura y la identidad Supabase correspondiente bajo RLS. `/health` no ejecuta checks remotos, por lo que una caída de Ollama o la ausencia de Supabase no impiden arrancar el backend.
 
 ## Flujo del chat
 
@@ -22,8 +23,8 @@ La dirección de dependencias implementada es:
 
 ```text
 consola  --\
-           -> agente/orquestador -> catálogo cerrado de tools -> gateway de tienda -> Supabase
-Telegram --/                    \-> estado de conversación por sesión
+Telegram ---> agente/orquestador -> catálogo cerrado de tools -> gateway de tienda -> Supabase
+web      --/                    \-> estado de conversación por sesión
                                 \-> cliente de Ollama
 ```
 
@@ -33,7 +34,7 @@ Telegram --/                    \-> estado de conversación por sesión
 - El cliente de Supabase para datos de usuario deberá recibir el JWT del usuario por solicitud. La publishable key identifica la aplicación, no autoriza por sí sola datos privados.
 - No se utilizará una tool `execute_sql`, texto SQL producido por el modelo ni una `service_role` key para saltar RLS.
 
-El agente y la consola no dependen entre sí mediante detalles de terminal, de modo que el mismo agente podrá componerse después desde HTTP. El endpoint de chat, la validación de JWT por solicitud y React siguen pendientes.
+El agente y la consola no dependen entre sí mediante detalles de terminal; el canal web compone ese mismo agente desde HTTP sin duplicarlo.
 
 ## Estado conversacional por sesión
 
@@ -48,7 +49,7 @@ history: últimos mensajes acotados
 
 Así, “Busca agua” guarda candidatos reales, “La segunda” selecciona un UUID estable y “¿cuánto queda?” consulta ese producto. “Muéstrame más” reutiliza filtros y avanza la página solo después de una lista paginada. Si falta una opción o hay varias interpretaciones, el agente pide aclaración.
 
-Cada ejecución de consola crea una sesión independiente. El historial, los candidatos, la selección y los tokens viven solo en memoria y se pierden al salir. La persistencia y coordinación entre réplicas se elegirán cuando exista el endpoint de chat y requisitos de retención.
+Cada ejecución de consola crea una sesión independiente. En la web, `WebSessionManager` mantiene una conversación por usuario ligada al `session_id` de su inicio de sesión, con su propia instancia del agente, una cola secuencial (un turno en curso y uno en espera), cierre explícito al salir y limpieza tras 30 minutos de inactividad. Un nuevo inicio de sesión del mismo usuario reemplaza la conversación anterior. El historial, los candidatos, la selección y los tokens viven solo en memoria y se pierden al reiniciar el proceso; la persistencia y la coordinación entre réplicas quedan para cuando existan requisitos de retención.
 
 ## Contrato de resultados
 
@@ -83,11 +84,11 @@ React recibirá filas y metadatos de paginación, no texto preformateado como ú
 
 ## Autenticación y permisos
 
-La tabla de roles de negocio no sustituye RLS. La consola actual autentica una vez, conserva el cliente solo en memoria, ejecuta todas las tools con esa identidad y cierra únicamente la sesión local al salir. El flujo futuro para React será:
+La tabla de roles de negocio no sustituye RLS. La consola actual autentica una vez, conserva el cliente solo en memoria, ejecuta todas las tools con esa identidad y cierra únicamente la sesión local al salir. El flujo implementado para React es:
 
-1. React autentica mediante Supabase Auth.
-2. La API valida la identidad y conserva el token solo durante la solicitud.
-3. El gateway crea o utiliza un cliente Supabase con el JWT del usuario.
-4. RLS y las reglas de la tool aplican defensa en profundidad.
+1. React autentica mediante Supabase Auth con la publishable key y sin persistir la sesión.
+2. Cada solicitud a `/api/web` lleva `Authorization: Bearer <JWT>` y la API la valida con Supabase Auth antes de aceptarla.
+3. Al abrir la sesión web se comprueba el acceso administrativo con `checkActiveAdminAccess`; la conversación usa un cliente Supabase cuyo `accessToken` devuelve el JWT vigente del usuario.
+4. RLS y las reglas de la tool aplican defensa en profundidad. Un 401 devuelve la interfaz al acceso.
 
 Los endpoints operativos `/checks/*` no deben quedar públicos en producción. Sus respuestas actuales no incluyen URL ni claves, pero revelan disponibilidad de infraestructura.

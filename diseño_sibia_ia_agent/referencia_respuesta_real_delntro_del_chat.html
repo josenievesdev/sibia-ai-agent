@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      tailwind = { config: { corePlugins: { preflight: false } } };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces%3Awght%40100..900&family=Inter%3Awght%40100..900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *, ::before, ::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      data-pencil-name="Referencia · respuesta real dentro del chat"
+      class="box-border w-[760px] h-fit flex flex-col gap-[30px] p-[34px_36px] justify-start items-start bg-[#FFFFFF] [outline:1px_solid_#E9DFD4] [outline-offset:-0.5px] rounded-[18px]"
+    >
+      <div
+        data-pencil-name="Nota"
+        class="box-border w-full h-fit shrink-0 flex flex-col gap-[6px] justify-start items-start"
+      >
+        <div
+          data-pencil-name="Etiqueta"
+          class="text-[9.5px]/[normal] box-border text-[#B6ABA1] font-[Inter,system-ui,sans-serif] font-bold tracking-[1.2px] text-left [white-space:nowrap]"
+        >
+          REFERENCIA · NO ES UNA PANTALLA
+        </div>
+        <div
+          data-pencil-name="Descripción"
+          class="text-[13px]/[20px] box-border w-full text-[#8C837B] font-[Inter,system-ui,sans-serif] font-normal text-left"
+        >
+          Así se ve la conversación cuando SIBIA responde de verdad: jerarquía, tabla y estado de
+          carga.
+        </div>
+      </div>
+      <div
+        data-pencil-name="Conversación"
+        class="box-border w-full h-fit shrink-0 flex flex-col gap-[30px] justify-start items-start"
+      >
+        <div
+          data-pencil-name="Turno usuario"
+          class="box-border w-full h-fit shrink-0 flex flex-row gap-0 justify-end items-start"
+        >
+          <div
+            data-pencil-name="Mensaje"
+            class="box-border w-[400px] shrink-0 h-fit flex flex-row gap-0 p-[12px_18px] justify-start items-start bg-[#F6F1EA] rounded-[14px]"
+          >
+            <div
+              data-pencil-name="Texto"
+              class="text-[15px]/[23px] box-border [flex:1_1_0] text-[#241F1C] font-[Inter,system-ui,sans-serif] font-normal text-right"
+            >
+              ¿Qué productos tienen menos existencias?
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-name="Turno SIBIA"
+          class="box-border w-full h-fit shrink-0 flex flex-col gap-[16px] justify-start items-start"
+        >
+          <div
+            data-pencil-name="Autoría"
+            class="text-[10.5px]/[normal] box-border text-[#B6ABA1] font-[Fraunces,system-ui,sans-serif] font-semibold tracking-[2px] text-left [white-space:nowrap]"
+          >
+            SIBIA
+          </div>
+          <div
+            data-pencil-name="Respuesta"
+            class="text-[16.5px]/[28px] box-border w-[600px] text-[#241F1C] font-[Inter,system-ui,sans-serif] font-normal text-left"
+          >
+            Hoy hay tres productos por debajo del mínimo en {{ negocio }}. Te los dejo ordenados por
+            urgencia:
+          </div>
+          <div
+            data-pencil-name="Tabla"
+            class="box-border w-full h-fit shrink-0 flex flex-col gap-0 justify-start items-start"
+          >
+            <div
+              data-pencil-name="Encabezado"
+              class="[box-sizing:content-box] w-[688px] h-[23.5px] shrink-0 flex flex-row gap-[20px] p-[0px_4px_11px_4px] justify-start items-center [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#E9DFD4] [margin:0px_0px_-0.5px_0px]"
+            >
+              <div
+                data-pencil-name="Col Producto"
+                class="text-[10.5px]/[normal] box-border [flex:1_1_0] text-[#B6ABA1] font-[Inter,system-ui,sans-serif] font-bold tracking-[0.9px] text-left"
+              >
+                PRODUCTO
+              </div>
+              <div
+                data-pencil-name="Col Existencias"
+                class="text-[10.5px]/[normal] box-border w-[120px] shrink-0 text-[#B6ABA1] font-[Inter,system-ui,sans-serif] font-bold tracking-[0.9px] text-right"
+              >
+                EXISTENCIAS
+              </div>
+              <div
+                data-pencil-name="Col Precio"
+                class="text-[10.5px]/[normal] box-border w-[120px] shrink-0 text-[#B6ABA1] font-[Inter,system-ui,sans-serif] font-bold tracking-[0.9px] text-right"
+              >
+                PRECIO
+              </div>
+            </div>
+            <div
+              data-pencil-name="Fila · Gaseosa 2.5 L"
+              class="[box-sizing:content-box] w-[688px] h-[49.5px] shrink-0 flex flex-row gap-[20px] p-[16px_4px] justify-start items-center [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#F2EAE1] [margin:0px_0px_-0.5px_0px]"
+            >
+              <div
+                data-pencil-name="Celda producto"
+                class="box-border [flex:1_1_0] h-fit flex flex-row gap-[11px] justify-start items-center"
+              >
+                <div
+                  data-pencil-name="Icono"
+                  class="text-[15px]/[normal] box-border text-[#241F1C] font-[Inter,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  🥤
+                </div>
+                <div
+                  data-pencil-name="Nombre"
+                  class="text-[14.5px]/[normal] box-border [flex:1_1_0] text-[#241F1C] font-[Inter,system-ui,sans-serif] font-normal text-left"
+                >
+                  Gaseosa 2.5 L
+                </div>
+              </div>
+              <div
+                data-pencil-name="Celda existencias"
+                class="box-border w-[120px] shrink-0 h-fit flex flex-row gap-0 justify-end items-start"
+              >
+                <div
+                  data-pencil-name="Valor"
+                  class="text-[14.5px]/[normal] box-border text-[#241F1C] font-[Inter,system-ui,sans-serif] font-medium text-left [white-space:nowrap]"
+                >
+                  4
+                </div>
+              </div>
+              <div
+                data-pencil-name="Celda precio"
+                class="box-border w-[120px] shrink-0 h-fit flex flex-row gap-0 justify-end items-start"
+              >
+                <div
+                  data-pencil-name="Valor"
+                  class="text-[14.5px]/[normal] box-border text-[#56504A] font-[Inter,system-ui,sans-serif] font-medium text-left [white-space:nowrap]"
+                >
+                  $ 6.900
+                </div>
+              </div>
+            </div>
+            <div
+              data-pencil-name="Fila · Pan tajado"
+              class="[box-sizing:content-box] w-[688px] h-[49.5px] shrink-0 flex flex-row gap-[20px] p-[16px_4px] justify-start items-center [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#F2EAE1] [margin:0px_0px_-0.5px_0px]"
+            >
+              <div
+                data-pencil-name="Celda producto"
+                class="box-border [flex:1_1_0] h-fit flex flex-row gap-[11px] justify-start items-center"
+              >
+                <div
+                  data-pencil-name="Icono"
+                  class="text-[15px]/[normal] box-border text-[#241F1C] font-[Inter,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  🍞
+                </div>
+                <div
+                  data-pencil-name="Nombre"
+                  class="text-[14.5px]/[normal] box-border [flex:1_1_0] text-[#241F1C] font-[Inter,system-ui,sans-serif] font-normal text-left"
+                >
+                  Pan tajado
+                </div>
+              </div>
+              <div
+                data-pencil-name="Celda existencias"
+                class="box-border w-[120px] shrink-0 h-fit flex flex-row gap-0 justify-end items-start"
+              >
+                <div
+                  data-pencil-name="Valor"
+                  class="text-[14.5px]/[normal] box-border text-[#241F1C] font-[Inter,system-ui,sans-serif] font-medium text-left [white-space:nowrap]"
+                >
+                  7
+                </div>
+              </div>
+              <div
+                data-pencil-name="Celda precio"
+                class="box-border w-[120px] shrink-0 h-fit flex flex-row gap-0 justify-end items-start"
+              >
+                <div
+                  data-pencil-name="Valor"
+                  class="text-[14.5px]/[normal] box-border text-[#56504A] font-[Inter,system-ui,sans-serif] font-medium text-left [white-space:nowrap]"
+                >
+                  $ 4.500
+                </div>
+              </div>
+            </div>
+            <div
+              data-pencil-name="Fila · Caramelos surtidos"
+              class="[box-sizing:content-box] w-[688px] h-[49.5px] shrink-0 flex flex-row gap-[20px] p-[16px_4px] justify-start items-center [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#F2EAE1] [margin:0px_0px_-0.5px_0px]"
+            >
+              <div
+                data-pencil-name="Celda producto"
+                class="box-border [flex:1_1_0] h-fit flex flex-row gap-[11px] justify-start items-center"
+              >
+                <div
+                  data-pencil-name="Icono"
+                  class="text-[15px]/[normal] box-border text-[#241F1C] font-[Inter,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  🍬
+                </div>
+                <div
+                  data-pencil-name="Nombre"
+                  class="text-[14.5px]/[normal] box-border [flex:1_1_0] text-[#241F1C] font-[Inter,system-ui,sans-serif] font-normal text-left"
+                >
+                  Caramelos surtidos
+                </div>
+              </div>
+              <div
+                data-pencil-name="Celda existencias"
+                class="box-border w-[120px] shrink-0 h-fit flex flex-row gap-0 justify-end items-start"
+              >
+                <div
+                  data-pencil-name="Valor"
+                  class="text-[14.5px]/[normal] box-border text-[#241F1C] font-[Inter,system-ui,sans-serif] font-medium text-left [white-space:nowrap]"
+                >
+                  12
+                </div>
+              </div>
+              <div
+                data-pencil-name="Celda precio"
+                class="box-border w-[120px] shrink-0 h-fit flex flex-row gap-0 justify-end items-start"
+              >
+                <div
+                  data-pencil-name="Valor"
+                  class="text-[14.5px]/[normal] box-border text-[#56504A] font-[Inter,system-ui,sans-serif] font-medium text-left [white-space:nowrap]"
+                >
+                  $ 1.200
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            data-pencil-name="Cierre"
+            class="text-[12.5px]/[20px] box-border w-[600px] text-[#B6ABA1] font-[Inter,system-ui,sans-serif] font-normal text-left"
+          >
+            En móvil la tabla conserva estas columnas y se desplaza en horizontal.
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-name="Estado · consultando"
+        class="[box-sizing:content-box] w-[688px] h-[53.5px] shrink-0 flex flex-row gap-[14px] p-[20px_0px_0px_0px] justify-start items-center [border-width:1px_0px_0px_0px] [border-style:solid] [border-color:#F2EAE1] [margin:-0.5px_0px_0px_0px]"
+      >
+        <div
+          data-pencil-name="Pulso de marca"
+          class="box-border w-[34px] shrink-0 h-[34px] relative"
+        >
+          <div
+            data-pencil-name="Aro"
+            class="box-border w-[34px] h-[34px] opacity-[0.22] absolute left-0 top-0 [outline:1px_solid_#B4552F] [outline-offset:-0.5px] rounded-full [z-index:0]"
+          ></div>
+          <svg
+            data-pencil-name="Símbolo Parte 1"
+            viewBox="-0.000002384185791015625 -9.5367431640625e-7 36.9467568397522 23.565102577209473"
+            preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[10.263px] h-[6.546px] absolute left-[13.722px] top-[18.135px] overflow-visible [z-index:1]"
+          >
+            <path
+              d="M34.91469 1.75497l0 6.18858-22.16806 13.16229 0-6.74279c-0.5542 0.18473-1.1084 0.32329-1.80115 0.5542l0 6.18859-7.80501-4.57217c-0.87749 0.18473-1.89352 0.23092-3.14047 0.2771l11.49968 6.65042c0.18473 0.13855 0.60038 0.13855 0.78512 0l24.24631-14.13213c0.2771-0.13855 0.41565-0.36947 0.41565-0.69276l0-8.6363c-0.5542 0.5542-1.1084 1.1084-1.98589 1.70879l-0.04618 0 0 0.04618z"
+              fill="#B4552F"
+            ></path>
+          </svg>
+          <svg
+            data-pencil-name="Símbolo Parte 2"
+            viewBox="0.000003073364496231079 -0.0000025331974029541016 63.37581708654761 47.07248178124428"
+            preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[17.604px] h-[13.076px] absolute left-[8.203px] top-[9.344px] overflow-visible [z-index:2]"
+          >
+            <path
+              d="M47.2578 4.12187c-1.75497 0-3.92559 0.18473-6.9737 0.69275l-8.08211-4.71071c-0.23092-0.13855-0.64657-0.13855-0.87749 0l-24.15394 13.62412c-0.2771 0.13855-0.46183 0.36947-0.46183 0.69275l0 7.62027c-2.03207 2.12444-6.4195 6.46568-6.6966 12.23862-0.2771 5.77293 4.15651 12.79282 17.27261 12.79281 2.30917 0 4.57216-0.09237 6.83515-0.46183 9.00578-1.33932 20.92111-5.91148 29.04939-12.97755 4.29506-3.74086 10.20654-9.83708 10.20654-17.82681-0.09237-7.20462-7.06607-11.77678-16.11802-11.68442z m6.65041 10.43746l-10.20654 6.4195-10.29891-6.37331 10.25273-5.68057 10.25272 5.63438z m-22.16805-12.60808l10.16036 5.91148-10.16036 5.5882-10.068-5.5882 10.068-5.91148z m-11.96152 6.9737l10.16036 5.63438-10.11417 6.4195-10.39128-6.4195 10.34509-5.63438z m-2.54009 36.39256c-7.85119 0.09237-15.33291-2.81719-15.37909-10.34509-0.04618-3.9256 2.44772-7.57409 4.84927-10.43746l0 15.70237c0 0.32328 0.09237 0.60038 0.36947 0.73894 0.78512 0.46183 1.9397 1.1084 2.86337 1.61642 1.61642 0.50802 3.18666 0.92367 5.21873 1.1084l-6.65042-4.06414 0-23.23028 22.30661 12.97755 0 11.96152 1.80116-0.60039 0-11.31495 22.21424-13.02373 0 10.57601c0.5542-0.32328 1.98589-2.26299 1.98588-2.26298l0-10.25273c0-0.2771-0.18473-0.50802-0.36946-0.64657l-13.67031-7.52791c1.47787-0.18473 2.90956-0.2771 4.2027-0.2771 4.06414-0.04618 7.06607 0.73894 9.37524 2.03208 2.44772 1.3855 5.12636 3.64849 5.21873 7.75882 0.09236 4.06414-2.35535 7.85119-4.47979 10.43746-5.49583 6.60423-13.06992 10.94548-20.27454 13.99358-5.21873 2.12444-11.7306 4.94163-19.62797 5.08018l0.04618 0z m14.50161-17.41116l-10.02181-5.91148 10.02181-6.18858 10.11418 6.18858-10.11418 5.91148z"
+              fill="#B4552F"
+            ></path>
+          </svg>
+        </div>
+        <div
+          data-pencil-name="Mensaje"
+          class="text-[14.5px]/[normal] box-border text-[#8C837B] font-[Inter,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+        >
+          SIBIA está consultando la información…
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

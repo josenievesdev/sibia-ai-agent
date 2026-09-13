@@ -1,0 +1,146 @@
+/* Turnos de la conversación y estado de consulta. */
+
+.turn {
+  margin: 0;
+}
+
+.turn--user {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.turn__bubble {
+  max-width: min(400px, 88%);
+  margin: 0;
+  padding: 12px 18px;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-bubble);
+  color: var(--color-graphite);
+  font-size: 15px;
+  line-height: 23px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.turn--assistant {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.turn__author {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 2px;
+  color: var(--color-text-muted);
+}
+
+.consulting {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 34px;
+  color: var(--color-text-muted);
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+
+/* Pulso de marca: aro fijo, halo que se expande y símbolo que respira. */
+.brand-pulse {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+}
+
+.brand-pulse::before,
+.brand-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--color-terracotta);
+  border-radius: 50%;
+}
+
+.brand-pulse::before {
+  opacity: 0.22;
+}
+
+.brand-pulse::after {
+  opacity: 0;
+  animation: brand-pulse-halo 2.4s cubic-bezier(0.25, 0.6, 0.3, 1) infinite;
+}
+
+.brand-pulse__symbol {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  animation: brand-pulse-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes brand-pulse-halo {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes brand-pulse-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.72;
+    transform: scale(0.92);
+  }
+}
+
+.thread__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.thread__error-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2.5px;
+  color: var(--color-terracotta);
+}
+
+@media (min-width: 768px) {
+  .turn--assistant {
+    gap: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-pulse::after,
+  .brand-pulse__symbol {
+    animation: none;
+  }
+}
