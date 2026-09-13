@@ -2,7 +2,7 @@
 
 ## Alcance implementado
 
-La etapa actual establece ocho límites ejecutables:
+La etapa actual establece nueve límites ejecutables:
 
 1. `config`: valida entorno y evita configuraciones parciales o un modelo distinto al acordado.
 2. `http`: expone salud del proceso y comprobaciones explícitas de integraciones.
@@ -12,6 +12,7 @@ La etapa actual establece ocho límites ejecutables:
 6. `store`: define el gateway de tienda e implementa consultas predeterminadas a Supabase.
 7. `tools`: valida entradas cerradas y traduce datos, vacíos y errores a resultados estructurados.
 8. `console`: gestiona entrada oculta, autenticación, conversación libre y cierre de sesiones interactivas.
+9. `channels/telegram`: adapta chats privados mediante long polling, autoriza IDs y conserva una instancia de agente y una cola por usuario.
 
 El primer chat funciona mediante `npm run chat`; usa exactamente `ministral-3:8b`, las cinco tools de lectura y la sesión Supabase del usuario bajo RLS. No hay todavía endpoint de chat ni frontend. `/health` tampoco ejecuta checks remotos, por lo que una caída de Ollama o la ausencia de Supabase no impiden arrancar el backend.
 
@@ -20,9 +21,10 @@ El primer chat funciona mediante `npm run chat`; usa exactamente `ministral-3:8b
 La dirección de dependencias implementada es:
 
 ```text
-consola -> agente/orquestador -> catálogo cerrado de tools -> gateway de tienda -> Supabase
-                             \-> estado de conversación por sesión
-                             \-> cliente de Ollama
+consola  --\
+           -> agente/orquestador -> catálogo cerrado de tools -> gateway de tienda -> Supabase
+Telegram --/                    \-> estado de conversación por sesión
+                                \-> cliente de Ollama
 ```
 
 - El orquestador decide si responde, pide aclaración o invoca una tool; no conoce tablas ni construye SQL.

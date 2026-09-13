@@ -1,6 +1,6 @@
 # SIBIA
 
-Base inicial del backend de SIBIA, un asistente empresarial con IA para una tienda real. Esta etapa incorpora la API HTTP, comprobaciones de infraestructura, cinco tools de lectura y un primer chat conversacional ejecutable desde consola; todavía no incluye frontend ni un endpoint de chat.
+Base inicial del backend de SIBIA, un asistente empresarial con IA para una tienda real. Esta etapa incorpora la API HTTP, comprobaciones de infraestructura, cinco tools de lectura y el mismo agente conversacional desde consola o Telegram; todavía no incluye frontend ni un endpoint de chat.
 
 ## Requisitos comprobados
 
@@ -45,6 +45,10 @@ Invoke-RestMethod -Uri "http://127.0.0.1:3000/checks/ollama"
 | `INTEGRATION_CHECK_TIMEOUT_MS` | `5000` | Tiempo límite de cada comprobación. |
 | `SUPABASE_URL` | vacío | URL del nuevo proyecto de Supabase. |
 | `SUPABASE_PUBLISHABLE_KEY` | vacío | Clave pública del nuevo proyecto. Nunca una `service_role` key. |
+| `TELEGRAM_BOT_TOKEN` | vacío | Token entregado por `@BotFather`; solo se exige al ejecutar Telegram. |
+| `TELEGRAM_ALLOWED_USER_IDS` | vacío | IDs numéricos autorizados, separados por comas. Vacío deja disponible únicamente `/id`. |
+| `TELEGRAM_SUPABASE_EMAIL` | vacío | Correo de la cuenta dedicada de Supabase Auth para el bot. |
+| `TELEGRAM_SUPABASE_PASSWORD` | vacío | Contraseña de la cuenta dedicada; nunca se solicita por Telegram. |
 
 El backend arranca si las dos variables de Supabase están vacías. Si solo se configura una, falla al iniciar con un mensaje explícito para evitar una configuración parcial.
 
@@ -55,6 +59,8 @@ No se deben guardar secretos en `.env.example`, Git, logs ni documentación. `.e
 ```powershell
 npm run dev
 npm run chat
+npm run telegram
+npm run telegram:debug
 npm run typecheck
 npm run build
 npm test
@@ -73,6 +79,21 @@ En un checkout limpio, ejecutar `npm run build` antes de `npm start` para genera
 `check:admin` solicita credenciales sin mostrar la contraseña, inicia una sesión de usuario y comprueba la lectura de roles y productos bajo RLS. `tools:console` reutiliza el mismo flujo de sesión y permite invocar manualmente `buscar_productos`, `listar_productos`, `consultar_stock`, `consultar_proveedores_producto` y `resumen_inventario`. Ninguno de los dos comandos persiste la sesión.
 
 `chat` solicita las credenciales una sola vez y abre una conversación libre con Ollama. El agente decide cuándo usar las cinco tools, conserva referencias y paginación en memoria, limita cada turno a seis rondas de tools, acota el contexto enviado a Ollama para no superar `num_ctx` y termina con `/salir`. La contraseña, las claves y los tokens de Supabase no se envían a Ollama ni se guardan; el cierre afecta solo a la sesión local de la consola.
+
+## Telegram local
+
+Telegram reutiliza `StoreChatAgent`, las mismas tools y el mismo gateway de tienda. El adaptador usa la API HTTP nativa con long polling: no necesita webhook, servidor público ni una dependencia adicional. Cada ID autorizado obtiene una instancia de agente y una cola propias en memoria; `/reiniciar` y `/salir` eliminan únicamente esa conversación.
+
+Para crear y autorizar el bot:
+
+1. Abre el chat verificado `@BotFather` en Telegram y envía `/newbot`.
+2. Indica el nombre visible y un nombre de usuario único terminado en `bot`.
+3. Guarda el token entregado por BotFather únicamente como `TELEGRAM_BOT_TOKEN` en `.env`.
+4. Crea desde el panel del proyecto nuevo una cuenta dedicada de Supabase Auth. Asígnale un perfil activo con rol de negocio `admin` siguiendo [`docs/supabase-database-setup.md`](docs/supabase-database-setup.md), y configura su correo y contraseña en `TELEGRAM_SUPABASE_EMAIL` y `TELEGRAM_SUPABASE_PASSWORD`.
+5. Deja `TELEGRAM_ALLOWED_USER_IDS` vacío, ejecuta `npm run telegram`, abre un chat privado con el bot y envía `/id`.
+6. Copia la respuesta numérica a `TELEGRAM_ALLOWED_USER_IDS`, separando varios IDs con comas, y reinicia el comando.
+
+Con una lista vacía, `/id` es la única operación permitida. Los archivos, imágenes, audio y stickers no se procesan en esta primera versión. La memoria se pierde al reiniciar el proceso y una sola instancia local debe atender el token del bot a la vez.
 
 Para comprobar el nuevo proyecto sin escribir secretos en archivos:
 
@@ -118,6 +139,7 @@ Las migraciones ejecutables están en `supabase/migrations`. El orden de SQL Edi
 - `src/store`: contrato del gateway de tienda y consultas predeterminadas a Supabase.
 - `src/tools`: contratos de entrada cerrados y resultados estructurados para lectura.
 - `src/console`: entrada interactiva, conversación libre y ciclo de vida de sesiones de usuario.
+- `src/channels/telegram`: long polling, autorización por ID, adaptación de mensajes y sesiones aisladas que reutilizan el agente existente.
 - `src/scripts`: verificaciones y consola de tools sin levantar un servidor real.
 - `database/reference`: material original no ejecutable.
 - `docs`: arquitectura prevista y análisis del esquema.
